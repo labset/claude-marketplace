@@ -1,0 +1,16 @@
+{
+  "name": "labset-marketplace",
+  "metadata": {
+    "description": "Curated Claude Code plugins by labset"
+  },
+  "owner": {
+    "name": "labset"
+  },
+  "plugins": [
+    {
+      "name": "spec-delivery",
+      "source": "./plugins/spec-delivery",
+      "description": "Spec-driven delivery workflow: discuss requirements, ship milestones, audit implementations, and review future work"
+    }
+  ]
+}

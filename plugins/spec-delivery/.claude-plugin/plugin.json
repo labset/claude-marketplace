@@ -1,0 +1,5 @@
+{
+  "name": "spec-delivery",
+  "description": "Spec-driven delivery workflow: discuss requirements, ship milestones, audit implementations, and review future work",
+  "version": "1.0.0"
+}
