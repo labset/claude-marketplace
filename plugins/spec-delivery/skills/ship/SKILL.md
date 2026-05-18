@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # /ship - Build, Iterate, and Ensure Production Readiness
 
-You are facilitating an interactive delivery session. Your goal is to help the user implement the work defined in a spec, milestone by milestone, ensuring production readiness at each step.
+You are an autonomous delivery agent. Your goal is to implement the work defined in a spec, milestone by milestone, ensuring production readiness at each step. Work through all milestones without waiting for user input unless you are blocked.
 
 ## Setup
 
@@ -16,34 +16,33 @@ You are facilitating an interactive delivery session. Your goal is to help the u
 2. Read `specs/yyyy-mm-dd-xx-<name>/requirements.md` and `specs/yyyy-mm-dd-xx-<name>/milestones.md`
 3. Display a summary of the current state: which milestones are done, in-progress, or pending
 
-## Interactive Loop
+## Delivery Loop
 
-Work through milestones sequentially. For each milestone:
+Work through all milestones sequentially and autonomously. For each milestone:
 
 ### Phase 1: Plan
 - Review the milestone's description and acceptance criteria
-- Propose an implementation plan: what files to create/modify, what approach to take
-- Confirm the plan with the user before proceeding
+- Determine the implementation approach: what files to create/modify and in what order
 
 ### Phase 2: Build
 - Implement the changes according to the plan
 - Follow all project conventions from CLAUDE.md
 - After implementation, run relevant build/test commands to verify:
-  - For Go code: use the appropriate pnpm build targets
-  - For TypeScript code: use the appropriate pnpm build targets
-  - For proto schemas: use buf to regenerate and verify
+  - Detect the project's build system from its configuration files (e.g. Makefile, package.json, Cargo.toml, go.mod, pom.xml, build.gradle, mise.toml, .mise.toml, etc.) and CLAUDE.md
+  - Use the project's own build and test commands — do not assume a specific package manager or toolchain
 - Fix any issues that arise
 
 ### Phase 3: Verify
-- Walk through each acceptance criterion with the user
-- For each criterion, confirm it is met or identify what's missing
+- Walk through each acceptance criterion against the implementation
+- For each criterion, confirm it is met or fix what's missing
 - Iterate until all criteria are satisfied
 
-### Phase 4: Update Status
+### Phase 4: Commit and Update Status
 - Update `milestones.md` to mark the milestone as done:
   - Set **Status:** to `done`
   - Check off completed acceptance criteria
-- Ask the user if they want to proceed to the next milestone
+- Commit the milestone's changes with a descriptive message: `ship(<spec-name>): <milestone name>`
+- Proceed immediately to the next milestone
 
 ## Production Readiness Checks
 
@@ -58,6 +57,7 @@ Before marking a milestone as done, verify:
 - Always read the latest state of requirements.md and milestones.md before starting work
 - Work on one milestone at a time, in order
 - Do not skip ahead to future milestones without completing current ones
-- Keep the user informed of progress throughout
-- If a milestone's scope needs to change, suggest updating the spec files first via `/discuss`
+- Commit after each milestone is verified — do not batch commits across milestones
+- Only stop to ask the user if you are genuinely blocked (e.g. ambiguous requirement, missing dependency, failing build you cannot fix)
+- If a milestone's scope needs to change, stop and suggest updating the spec files first via `/discuss`
 - When updating milestones.md, preserve the existing format and only change status and checkboxes
