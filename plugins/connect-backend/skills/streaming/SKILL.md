@@ -13,14 +13,18 @@ You are generating Kafka streaming infrastructure from outbox events. Your goal 
 1. Determine the target:
    - If the user provides a path (e.g. `/streaming internal/acme/inventory/v1/`), use it
    - Otherwise, look for existing `outbox/event_*.go` files and ask the user which entities to generate streaming for
-2. Read the outbox event files to understand available event types
-3. Read the proto files or handler files to determine the domain and version for topic naming
-4. Determine subscriber types:
+2. Resolve the package path — locate the existing `internal/<provider>/<domain>/<version>/` root:
+   - The `outbox/` package already exists at `internal/<provider>/<domain>/<version>/outbox/` from the `/outbox` skill
+   - Workers go in `internal/<provider>/<domain>/<version>/workers/`
+   - Consumers go in `internal/<provider>/<domain>/<version>/consumers/`
+   - All Go imports for sibling subpackages use `<module>/internal/<provider>/<domain>/<version>/<subpackage>`
+3. Read the outbox event files to understand available event types
+4. Read the proto files or handler files to determine the domain and version for topic naming
+5. Determine subscriber types:
    - Ask the user which consumer groups to generate: audit, index, webhook, notification
    - Or accept custom subscriber names
-5. Verify `github.com/segmentio/kafka-go` is in `go.mod`
+6. Verify `github.com/segmentio/kafka-go` is in `go.mod`
    - If not, inform the user: `go get github.com/segmentio/kafka-go`
-6. Output directories: `workers/` and `consumers/` alongside `api/`, `db/`, and `outbox/`
 
 ## Phase 1: Event Envelope
 

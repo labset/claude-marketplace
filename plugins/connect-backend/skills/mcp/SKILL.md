@@ -13,12 +13,15 @@ You are generating MCP (Model Context Protocol) tool wrappers for Connect-RPC se
 1. Determine the target:
    - If the user provides a path (e.g. `/mcp internal/acme/inventory/v1/`), use it
    - Otherwise, look for existing `api/handler_*.go` files and ask the user which entities to generate MCP tools for
-2. Read the service proto files to understand RPC signatures and request/response types
-3. Read the handler files to understand available operations
-4. Read `go.mod` for module path and verify MCP SDK dependency:
+2. Resolve the package path — locate the existing `internal/<provider>/<domain>/<version>/` root:
+   - The `api/` package already exists at `internal/<provider>/<domain>/<version>/api/` from the `/handlers` skill
+   - MCP tools go in `internal/<provider>/<domain>/<version>/mcp/`
+   - All Go imports for sibling subpackages use `<module>/internal/<provider>/<domain>/<version>/<subpackage>`
+3. Read the service proto files to understand RPC signatures and request/response types
+4. Read the handler files to understand available operations
+5. Read `go.mod` for module path and verify MCP SDK dependency:
    - Check for `github.com/mark3labs/mcp-go` or the project's preferred MCP SDK
    - If not present, inform the user to add it
-5. Output directory: `mcp/` alongside `api/`, `db/`, etc.
 
 ## Phase 1: Tool Registry
 

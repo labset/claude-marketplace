@@ -16,13 +16,16 @@ You are generating Connect-RPC handler implementations for proto services. Your 
 2. Read the service proto files to understand available RPCs
 3. Read the sqlc-generated code in the `db/` package within the output directory to understand available queries and types
 4. Read `go.mod` to determine the Go module path
-5. Derive import paths:
-   - From the proto file's `go_package` option, extract:
-     - **protoImport**: the full Go import path (e.g. `github.com/acme/inventory/v1`)
-     - **protoAlias**: the package alias (e.g. `inventoryv1`)
-     - **connectImport**: `<protoImport>/<protoAlias>connect` (e.g. `github.com/acme/inventory/v1/inventoryv1connect`)
-     - **connectAlias**: `<protoAlias>connect`
-6. Determine the output directory: `<base>/api/` alongside the `db/` and `sql/` directories
+5. Resolve the package path from the proto file's `package` declaration:
+   - The proto package segments map directly to the folder path: `acme.inventory.v1` becomes `internal/acme/inventory/v1/`
+   - The output directory for handlers is `internal/<provider>/<domain>/<version>/api/`
+   - The `db/` package produced by `/schema` lives at `internal/<provider>/<domain>/<version>/db/`
+   - All Go imports for sibling subpackages use `<module>/internal/<provider>/<domain>/<version>/<subpackage>`
+6. Derive import paths from the proto file's `go_package` option:
+   - **protoImport**: the full Go import path (e.g. `github.com/acme/inventory/v1`)
+   - **protoAlias**: the package alias (e.g. `inventoryv1`)
+   - **connectImport**: `<protoImport>/<protoAlias>connect` (e.g. `github.com/acme/inventory/v1/inventoryv1connect`)
+   - **connectAlias**: `<protoAlias>connect`
 
 ## Phase 1: Handler Struct
 

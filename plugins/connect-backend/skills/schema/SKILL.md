@@ -16,10 +16,24 @@ You are generating the database layer for a Connect-RPC backend. Your goal is to
 2. Read the proto files and identify entity messages:
    - An entity message is one that embeds a `clarity.plugin.v1.Entity` field or has fields like `id`, `created_at`, `updated_at` that indicate it is a database-backed entity
    - If no clear entity marker exists, ask the user which messages represent database entities
-3. Determine the output directory:
-   - Follow the convention: `internal/<provider>/<domain>/<version>/` derived from the proto package name (e.g. `acme.inventory.v1` maps to `internal/acme/inventory/v1/`)
-   - If the project already has an established layout, follow that instead
-4. Read `go.mod` to determine the Go module path for import references
+3. Resolve the package path — this convention is critical and must be followed by all connect-backend skills:
+   - Read the proto file's `package` declaration (e.g. `package acme.inventory.v1;`)
+   - The package segments map directly to the folder path: `acme.inventory.v1` becomes `internal/acme/inventory/v1/`
+   - The output directory for this skill is `internal/<provider>/<domain>/<version>/`
+   - All subpackages (`sql/`, `db/`, `api/`, `outbox/`, `workers/`, `consumers/`, `mcp/`) are nested under this path
+   - Example: proto package `acme.inventory.v1` produces:
+     ```
+     internal/acme/inventory/v1/
+     ├── sql/
+     ├── db/
+     ├── api/
+     ├── outbox/
+     ├── workers/
+     ├── consumers/
+     └── mcp/
+     ```
+   - If the project already has generated code from a previous skill run, use the same path
+4. Read `go.mod` to determine the Go module path — all Go imports for subpackages use `<module>/internal/<provider>/<domain>/<version>/<subpackage>`
 
 ## Phase 1: Schema Generation
 

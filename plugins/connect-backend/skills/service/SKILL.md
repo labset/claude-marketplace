@@ -17,8 +17,10 @@ You are generating Connect-RPC service `.proto` files from entity message defini
 3. Determine which CRUD operations to generate for each entity:
    - Ask the user which operations each entity needs: Create, Get, List, Update, Delete
    - Default to all five if the user does not specify
-4. Determine the output directory for the generated `.proto` files:
-   - Place them alongside the entity proto files (same directory)
+4. Resolve the package path from the proto file's `package` declaration:
+   - The proto package segments map directly to the folder path: `acme.inventory.v1` becomes the proto directory `protos/acme/inventory/v1/` (or wherever the source protos live)
+   - Place generated service `.proto` files alongside the entity proto files in the same directory
+   - The `go_package` option must match the convention: `<module>/internal/<provider>/<domain>/<version>;<alias>` where alias concatenates domain and version (e.g. `inventoryv1`)
 
 ## Phase 1: Service Definition
 

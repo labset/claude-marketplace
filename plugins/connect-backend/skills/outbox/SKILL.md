@@ -13,10 +13,13 @@ You are adding the transactional outbox pattern to existing Connect-RPC handlers
 1. Determine the target:
    - If the user provides a path (e.g. `/outbox internal/acme/inventory/v1/`), use it
    - Otherwise, look for existing `api/handler_*.go` files and ask the user which entities to add outbox to
-2. Read the existing handler files in `api/` to understand the current structure
-3. Read `go.mod` for module path and verify `github.com/riverqueue/river` is a dependency
+2. Resolve the package path — locate the existing `internal/<provider>/<domain>/<version>/` root:
+   - The `api/` package already exists at `internal/<provider>/<domain>/<version>/api/` from the `/handlers` skill
+   - The outbox event args go in `internal/<provider>/<domain>/<version>/outbox/`
+   - All Go imports for sibling subpackages use `<module>/internal/<provider>/<domain>/<version>/<subpackage>`
+3. Read the existing handler files in `api/` to understand the current structure
+4. Read `go.mod` for module path and verify `github.com/riverqueue/river` is a dependency
    - If River is not in `go.mod`, inform the user they need to add it: `go get github.com/riverqueue/river`
-4. Determine the output directory for event args: `outbox/` alongside `api/` and `db/`
 
 ## Phase 1: Event Args
 
