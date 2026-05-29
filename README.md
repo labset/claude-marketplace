@@ -45,6 +45,21 @@ Install a plugin:
 /plugin install connect-backend@labset-marketplace
 ```
 
+### Updating
+
+Refresh the marketplace to pick up new plugins or updates to existing ones:
+
+```
+/plugin marketplace refresh labset-marketplace
+```
+
+Update an installed plugin to the latest version:
+
+```
+/plugin update spec-delivery@labset-marketplace
+/plugin update connect-backend@labset-marketplace
+```
+
 ### Auto-prompt for a repo
 
 Add to any repo's `.claude/settings.json`:
