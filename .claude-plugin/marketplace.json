@@ -11,6 +11,11 @@
       "name": "spec-delivery",
       "source": "./plugins/spec-delivery",
       "description": "Spec-driven delivery workflow: discuss requirements, ship milestones, audit implementations, and review future work"
+    },
+    {
+      "name": "connect-backend",
+      "source": "./plugins/connect-backend",
+      "description": "Incrementally scaffold Connect-RPC backends from proto definitions: schema, services, handlers, outbox, streaming, and MCP tools"
     }
   ]
 }
