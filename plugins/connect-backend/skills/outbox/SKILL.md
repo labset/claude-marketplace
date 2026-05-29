@@ -8,6 +8,14 @@ disable-model-invocation: true
 
 You are adding the transactional outbox pattern to existing Connect-RPC handlers. Your goal is to read the current handler implementations and modify them to wrap mutating operations (create, update, delete) in database transactions with River job queue event insertion.
 
+## Prerequisites
+
+This skill requires artifacts from prior skills:
+- **Handler implementations** from `/handlers` — `api/handler_*.go` and `api/rpc_*.go` files with CRUD implementations
+- **sqlc store** from `/schema` + `sqlc generate` — the `db/` package, specifically `Queries.WithTx()` for transactional usage
+
+If these do not exist, inform the user which skills to run first.
+
 ## Setup
 
 1. Determine the target:

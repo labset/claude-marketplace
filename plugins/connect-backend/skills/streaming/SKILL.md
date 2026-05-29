@@ -8,6 +8,13 @@ disable-model-invocation: true
 
 You are generating Kafka streaming infrastructure from outbox events. Your goal is to read existing outbox event definitions and produce River workers that publish to Kafka, plus typed consumer group stubs.
 
+## Prerequisites
+
+This skill requires artifacts from prior skills:
+- **Outbox event args** from `/outbox` — `outbox/event_*.go` files defining `Create<Model>EventArgs`, `Update<Model>EventArgs`, `Delete<Model>EventArgs`
+
+If these do not exist, inform the user to run `/outbox` first.
+
 ## Setup
 
 1. Determine the target:
@@ -206,12 +213,11 @@ func Run<Model><Subscriber>Consumer(ctx context.Context, brokers []string, handl
 
         var envelope workers.EventEnvelope
         if err := json.Unmarshal(msg.Value, &envelope); err != nil {
-            slog.ErrorContext(ctx, "unmarshal envelope", "error", err)
-            continue
+            return fmt.Errorf("unmarshal envelope: %w", err)
         }
 
         if err := handler.Handle<Model>Event(ctx, envelope); err != nil {
-            slog.ErrorContext(ctx, "handle event", "error", err, "entity_id", envelope.EntityID)
+            return fmt.Errorf("handle event: %w", err)
         }
     }
 }

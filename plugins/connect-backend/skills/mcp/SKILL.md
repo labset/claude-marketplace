@@ -8,6 +8,14 @@ disable-model-invocation: true
 
 You are generating MCP (Model Context Protocol) tool wrappers for Connect-RPC services. Your goal is to read existing service handlers and produce MCP tool implementations that expose CRUD operations for Claude integration.
 
+## Prerequisites
+
+This skill requires artifacts from prior skills:
+- **Handler implementations** from `/handlers` — `api/handler_*.go` files implementing the Connect service handler interface
+- **Service proto files** from `/service` — to understand RPC signatures and request/response types
+
+If these do not exist, inform the user which skills to run first.
+
 ## Setup
 
 1. Determine the target:
@@ -19,9 +27,10 @@ You are generating MCP (Model Context Protocol) tool wrappers for Connect-RPC se
    - All Go imports for sibling subpackages use `<module>/internal/<provider>/<domain>/<version>/<subpackage>`
 3. Read the service proto files to understand RPC signatures and request/response types
 4. Read the handler files to understand available operations
-5. Read `go.mod` for module path and verify MCP SDK dependency:
-   - Check for `github.com/mark3labs/mcp-go` or the project's preferred MCP SDK
-   - If not present, inform the user to add it
+5. Read `go.mod` for module path and detect which MCP SDK is in use:
+   - Check for `github.com/modelcontextprotocol/go-sdk` (official SDK — preferred)
+   - Check for `github.com/mark3labs/mcp-go` (community SDK — adapt if already in use)
+   - If neither is present, inform the user to add the official SDK: `go get github.com/modelcontextprotocol/go-sdk`
 
 ## Codebase Assessment
 
@@ -31,7 +40,7 @@ Before generating anything, scan the existing codebase to understand what alread
 
 1. **Existing MCP implementation**:
    - Search for existing MCP server setup code, tool registrations, or resource definitions
-   - Check which MCP SDK is in use (mark3labs/mcp-go, custom implementation, etc.)
+   - Check which MCP SDK is in use and adapt the generated code accordingly
    - Look for existing tool naming conventions and how tools delegate to backend services
 
 2. **Existing tool patterns**:
@@ -47,7 +56,7 @@ Before generating anything, scan the existing codebase to understand what alread
 ### What to present to the user
 
 Summarise your findings as a short assessment:
-- **Matches**: existing patterns that align (e.g. already uses mark3labs/mcp-go, tools delegate to handler interface)
+- **Matches**: existing patterns that align (e.g. tools delegate to handler interface)
 - **Divergences**: different MCP SDK, tools call HTTP endpoints instead of handler interface, different tool naming, etc.
 - **Proposed plan**: for each divergence, suggest one of:
   - **Adopt as-is**: follow the project's existing MCP conventions (e.g. "keep existing tool naming scheme")
@@ -64,8 +73,7 @@ Generate `mcp/registry_<entity_snake>.go` for each entity:
 package mcp
 
 import (
-    "github.com/mark3labs/mcp-go/mcp"
-    "github.com/mark3labs/mcp-go/server"
+    mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
     <connectAlias> "<connectImport>"
 )
@@ -74,40 +82,38 @@ type <modelSnake>Tools struct {
     handler <connectAlias>.<Model>ServiceHandler
 }
 
-func Register<Model>Tools(s *server.MCPServer, handler <connectAlias>.<Model>ServiceHandler) {
+func Register<Model>Tools(server *mcpsdk.Server, handler <connectAlias>.<Model>ServiceHandler) {
     t := &<modelSnake>Tools{handler: handler}
 
-    s.AddTool(mcp.NewTool(
-        "create_<model_snake>",
-        mcp.WithDescription("Create a new <model_lower>"),
-        mcp.WithString("item", mcp.Description("JSON representation of the <model_lower> to create"), mcp.Required()),
-    ), t.createTool)
+    server.AddTool(&mcpsdk.Tool{
+        Name:        "create_<model_snake>",
+        Description: "Create a new <model_lower>",
+        InputSchema: &jsonschema.Schema{Type: "object"},
+    }, t.createTool)
 
-    s.AddTool(mcp.NewTool(
-        "get_<model_snake>",
-        mcp.WithDescription("Get a <model_lower> by ID"),
-        mcp.WithString("id", mcp.Description("The UUID of the <model_lower>"), mcp.Required()),
-    ), t.getTool)
+    server.AddTool(&mcpsdk.Tool{
+        Name:        "get_<model_snake>",
+        Description: "Get a <model_lower> by ID",
+        InputSchema: &jsonschema.Schema{Type: "object"},
+    }, t.getTool)
 
-    s.AddTool(mcp.NewTool(
-        "list_<model_snake>s",
-        mcp.WithDescription("List <model_lower>s with pagination"),
-        mcp.WithNumber("page_size", mcp.Description("Number of items per page")),
-        mcp.WithString("page_token", mcp.Description("Pagination token from previous response")),
-    ), t.listTool)
+    server.AddTool(&mcpsdk.Tool{
+        Name:        "list_<model_snake>s",
+        Description: "List <model_lower>s with pagination",
+        InputSchema: &jsonschema.Schema{Type: "object"},
+    }, t.listTool)
 
-    s.AddTool(mcp.NewTool(
-        "update_<model_snake>",
-        mcp.WithDescription("Update a <model_lower>"),
-        mcp.WithString("item", mcp.Description("JSON representation of the <model_lower> to update"), mcp.Required()),
-        mcp.WithString("update_mask", mcp.Description("Comma-separated list of fields to update")),
-    ), t.updateTool)
+    server.AddTool(&mcpsdk.Tool{
+        Name:        "update_<model_snake>",
+        Description: "Update a <model_lower>",
+        InputSchema: &jsonschema.Schema{Type: "object"},
+    }, t.updateTool)
 
-    s.AddTool(mcp.NewTool(
-        "delete_<model_snake>",
-        mcp.WithDescription("Delete a <model_lower> by ID"),
-        mcp.WithString("id", mcp.Description("The UUID of the <model_lower>"), mcp.Required()),
-    ), t.deleteTool)
+    server.AddTool(&mcpsdk.Tool{
+        Name:        "delete_<model_snake>",
+        Description: "Delete a <model_lower> by ID",
+        InputSchema: &jsonschema.Schema{Type: "object"},
+    }, t.deleteTool)
 }
 ```
 
@@ -117,6 +123,8 @@ Only register tools for operations that exist in the service definition.
 
 Generate one file per operation: `mcp/tool_<operation>_<entity_snake>.go`
 
+Tools unmarshal `req.Params.Arguments` directly into the proto request type — do NOT double-encode by extracting individual string fields.
+
 ### Create (`tool_create_<entity>.go`)
 
 ```go
@@ -125,170 +133,127 @@ package mcp
 import (
     "context"
     "encoding/json"
-    "fmt"
 
     "connectrpc.com/connect"
-    "github.com/mark3labs/mcp-go/mcp"
+    mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
     <protoAlias> "<protoImport>"
 )
 
-func (t *<modelSnake>Tools) createTool(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    itemJSON, _ := req.Params.Arguments["item"].(string)
-
-    var item <protoAlias>.<Model>
-    if err := json.Unmarshal([]byte(itemJSON), &item); err != nil {
-        return nil, fmt.Errorf("unmarshal item: %w", err)
+func (t *<modelSnake>Tools) createTool(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
+    var protoReq <protoAlias>.Create<Model>Request
+    if err := json.Unmarshal(req.Params.Arguments, &protoReq); err != nil {
+        return nil, fmt.Errorf("unmarshal request: %w", err)
     }
 
-    resp, err := t.handler.Create<Model>(ctx, connect.NewRequest(&<protoAlias>.Create<Model>Request{
-        Item: &item,
-    }))
+    resp, err := t.handler.Create<Model>(ctx, connect.NewRequest(&protoReq))
     if err != nil {
-        return mcp.NewToolResultError(err.Error()), nil
+        return &mcpsdk.CallToolResult{
+            Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: err.Error()}},
+            IsError: true,
+        }, nil
     }
 
     data, _ := json.Marshal(resp.Msg)
-    return mcp.NewToolResultText(string(data)), nil
+    return &mcpsdk.CallToolResult{
+        Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: string(data)}},
+    }, nil
 }
 ```
 
 ### Get (`tool_get_<entity>.go`)
 
 ```go
-package mcp
+func (t *<modelSnake>Tools) getTool(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
+    var protoReq <protoAlias>.Get<Model>Request
+    if err := json.Unmarshal(req.Params.Arguments, &protoReq); err != nil {
+        return nil, fmt.Errorf("unmarshal request: %w", err)
+    }
 
-import (
-    "context"
-    "encoding/json"
-
-    "connectrpc.com/connect"
-    "github.com/mark3labs/mcp-go/mcp"
-
-    <protoAlias> "<protoImport>"
-)
-
-func (t *<modelSnake>Tools) getTool(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    id, _ := req.Params.Arguments["id"].(string)
-
-    resp, err := t.handler.Get<Model>(ctx, connect.NewRequest(&<protoAlias>.Get<Model>Request{
-        Id: id,
-    }))
+    resp, err := t.handler.Get<Model>(ctx, connect.NewRequest(&protoReq))
     if err != nil {
-        return mcp.NewToolResultError(err.Error()), nil
+        return &mcpsdk.CallToolResult{
+            Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: err.Error()}},
+            IsError: true,
+        }, nil
     }
 
     data, _ := json.Marshal(resp.Msg)
-    return mcp.NewToolResultText(string(data)), nil
+    return &mcpsdk.CallToolResult{
+        Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: string(data)}},
+    }, nil
 }
 ```
 
 ### List (`tool_list_<entity>.go`)
 
 ```go
-package mcp
-
-import (
-    "context"
-    "encoding/json"
-
-    "connectrpc.com/connect"
-    "github.com/mark3labs/mcp-go/mcp"
-
-    <protoAlias> "<protoImport>"
-)
-
-func (t *<modelSnake>Tools) listTool(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    var pageSize int32
-    if ps, ok := req.Params.Arguments["page_size"].(float64); ok {
-        pageSize = int32(ps)
+func (t *<modelSnake>Tools) listTool(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
+    var protoReq <protoAlias>.List<Model>sRequest
+    if err := json.Unmarshal(req.Params.Arguments, &protoReq); err != nil {
+        return nil, fmt.Errorf("unmarshal request: %w", err)
     }
-    pageToken, _ := req.Params.Arguments["page_token"].(string)
 
-    resp, err := t.handler.List<Model>s(ctx, connect.NewRequest(&<protoAlias>.List<Model>sRequest{
-        PageSize:  pageSize,
-        PageToken: pageToken,
-    }))
+    resp, err := t.handler.List<Model>s(ctx, connect.NewRequest(&protoReq))
     if err != nil {
-        return mcp.NewToolResultError(err.Error()), nil
+        return &mcpsdk.CallToolResult{
+            Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: err.Error()}},
+            IsError: true,
+        }, nil
     }
 
     data, _ := json.Marshal(resp.Msg)
-    return mcp.NewToolResultText(string(data)), nil
+    return &mcpsdk.CallToolResult{
+        Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: string(data)}},
+    }, nil
 }
 ```
 
 ### Update (`tool_update_<entity>.go`)
 
 ```go
-package mcp
-
-import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "strings"
-
-    "connectrpc.com/connect"
-    "github.com/mark3labs/mcp-go/mcp"
-    "google.golang.org/protobuf/types/known/fieldmaskpb"
-
-    <protoAlias> "<protoImport>"
-)
-
-func (t *<modelSnake>Tools) updateTool(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    itemJSON, _ := req.Params.Arguments["item"].(string)
-
-    var item <protoAlias>.<Model>
-    if err := json.Unmarshal([]byte(itemJSON), &item); err != nil {
-        return nil, fmt.Errorf("unmarshal item: %w", err)
+func (t *<modelSnake>Tools) updateTool(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
+    var protoReq <protoAlias>.Update<Model>Request
+    if err := json.Unmarshal(req.Params.Arguments, &protoReq); err != nil {
+        return nil, fmt.Errorf("unmarshal request: %w", err)
     }
 
-    updateReq := &<protoAlias>.Update<Model>Request{Item: &item}
-
-    if maskStr, ok := req.Params.Arguments["update_mask"].(string); ok && maskStr != "" {
-        updateReq.UpdateMask = &fieldmaskpb.FieldMask{
-            Paths: strings.Split(maskStr, ","),
-        }
-    }
-
-    resp, err := t.handler.Update<Model>(ctx, connect.NewRequest(updateReq))
+    resp, err := t.handler.Update<Model>(ctx, connect.NewRequest(&protoReq))
     if err != nil {
-        return mcp.NewToolResultError(err.Error()), nil
+        return &mcpsdk.CallToolResult{
+            Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: err.Error()}},
+            IsError: true,
+        }, nil
     }
 
     data, _ := json.Marshal(resp.Msg)
-    return mcp.NewToolResultText(string(data)), nil
+    return &mcpsdk.CallToolResult{
+        Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: string(data)}},
+    }, nil
 }
 ```
 
 ### Delete (`tool_delete_<entity>.go`)
 
 ```go
-package mcp
+func (t *<modelSnake>Tools) deleteTool(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
+    var protoReq <protoAlias>.Delete<Model>Request
+    if err := json.Unmarshal(req.Params.Arguments, &protoReq); err != nil {
+        return nil, fmt.Errorf("unmarshal request: %w", err)
+    }
 
-import (
-    "context"
-    "encoding/json"
-
-    "connectrpc.com/connect"
-    "github.com/mark3labs/mcp-go/mcp"
-
-    <protoAlias> "<protoImport>"
-)
-
-func (t *<modelSnake>Tools) deleteTool(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    id, _ := req.Params.Arguments["id"].(string)
-
-    resp, err := t.handler.Delete<Model>(ctx, connect.NewRequest(&<protoAlias>.Delete<Model>Request{
-        Id: id,
-    }))
+    resp, err := t.handler.Delete<Model>(ctx, connect.NewRequest(&protoReq))
     if err != nil {
-        return mcp.NewToolResultError(err.Error()), nil
+        return &mcpsdk.CallToolResult{
+            Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: err.Error()}},
+            IsError: true,
+        }, nil
     }
 
     data, _ := json.Marshal(resp.Msg)
-    return mcp.NewToolResultText(string(data)), nil
+    return &mcpsdk.CallToolResult{
+        Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: string(data)}},
+    }, nil
 }
 ```
 
@@ -314,7 +279,9 @@ func (t *<modelSnake>Tools) deleteTool(ctx context.Context, req mcp.CallToolRequ
 - Always read the service proto and handler files before generating MCP tools
 - Only generate tool files for operations that exist in the service
 - MCP tools delegate to the Connect handler interface — they do NOT directly access the database
-- Tool errors are returned as `mcp.NewToolResultError`, not as Go errors (so the MCP client sees them)
+- Tool errors are returned as `CallToolResult` with `IsError: true`, not as Go errors (so the MCP client sees them)
+- Unmarshal `req.Params.Arguments` directly into the proto request type — do not double-encode by extracting individual fields as strings
 - If MCP tool files already exist, ask the user before overwriting
 - Tool names use snake_case: `create_product`, `get_product`, `list_products`, etc.
 - The registry function takes the Connect service handler interface, not the concrete handler struct
+- If the project uses `mark3labs/mcp-go` instead of the official SDK, adapt the generated code to match that SDK's API

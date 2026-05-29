@@ -14,7 +14,7 @@ You are generating the database layer for a Connect-RPC backend. Your goal is to
    - If the user provides a path (e.g. `/schema protos/acme/inventory/v1/`), use it
    - Otherwise, search for `.proto` files in the project and ask the user which messages to target
 2. Read the proto files and identify entity messages:
-   - An entity message is one that embeds a `clarity.plugin.v1.Entity` field or has fields like `id`, `created_at`, `updated_at` that indicate it is a database-backed entity
+   - An entity message is one that embeds a `labset.data.v1.Entity` field, or has `ROLE_ENTITY` in its options, or has fields like `id`, `created_at`, `updated_at` that indicate it is a database-backed entity
    - If no clear entity marker exists, ask the user which messages represent database entities
 3. Resolve the package path — this convention is critical and must be followed by all connect-backend skills:
    - Read the proto file's `package` declaration (e.g. `package acme.inventory.v1;`)
@@ -101,7 +101,7 @@ For each entity message, generate a `CREATE TABLE` statement with:
 | `google.protobuf.Timestamp` | `TIMESTAMPTZ` |
 | `google.protobuf.Duration` | `INTERVAL` |
 | `google.protobuf.Struct` / `Value` | `JSONB` |
-| `enum` | `TEXT` with `CHECK` constraint listing valid enum values |
+| `enum` | `TEXT` |
 | `repeated <scalar>` | Array type (e.g. `TEXT[]`, `INTEGER[]`) |
 | `repeated <message>`, nested message, `map` | `JSONB` |
 | `oneof` variants | Nullable columns, one per variant |
@@ -120,44 +120,50 @@ For each entity message, generate a `CREATE TABLE` statement with:
 
 Generate `sql/queries/<entity_snake>.sql` for each entity.
 
-Each query file must use sqlc annotations. Generate the following queries:
+Each query file must use sqlc annotations with **named parameters** (`@param` style) and **explicit column lists** (not `SELECT *`). Generate the following queries:
 
 ```sql
 -- name: Get<Model> :one
-SELECT * FROM <schema>.<table>
-WHERE id = $1 AND deleted_at IS NULL;
+SELECT <all columns>
+FROM <schema>.<table>
+WHERE id = @id AND deleted_at IS NULL;
 
 -- name: List<Model>s :many
-SELECT * FROM <schema>.<table>
+SELECT <all columns>
+FROM <schema>.<table>
 WHERE deleted_at IS NULL
 ORDER BY created_at DESC;
 
 -- name: List<Model>sPaginated :many
-SELECT * FROM <schema>.<table>
-WHERE deleted_at IS NULL AND id < $1
-ORDER BY id DESC
-LIMIT $2;
+SELECT <all columns>
+FROM <schema>.<table>
+WHERE deleted_at IS NULL
+  AND (@cursor::uuid = '00000000-0000-0000-0000-000000000000'::uuid OR id > @cursor)
+ORDER BY id
+LIMIT @page_size;
 
 -- name: Create<Model> :one
 INSERT INTO <schema>.<table> (<all columns except deleted_at>)
-VALUES (<positional params>)
+VALUES (@id, @created_at, @updated_at, <@named params for each user field>)
 RETURNING *;
 
 -- name: Update<Model> :one
 UPDATE <schema>.<table>
-SET <all user fields + updated_at>, updated_at = $N
-WHERE id = $1 AND deleted_at IS NULL
+SET <all user fields as @named params>, updated_at = @updated_at
+WHERE id = @id AND deleted_at IS NULL
 RETURNING *;
 
 -- name: SoftDelete<Model> :execrows
 UPDATE <schema>.<table>
 SET deleted_at = NOW()
-WHERE id = $1 AND deleted_at IS NULL;
+WHERE id = @id AND deleted_at IS NULL;
 
--- name: Delete<Model> :execrows
+-- name: Delete<Model> :exec
 DELETE FROM <schema>.<table>
-WHERE id = $1;
+WHERE id = @id;
 ```
+
+The `List<Model>sPaginated` query uses a zero UUID sentinel for the initial page — when `@cursor` is the zero UUID, the `OR id > @cursor` condition returns all rows. Subsequent pages pass the last row's ID as the cursor, returning rows with `id > @cursor` in ascending order.
 
 ## Phase 3: sqlc Configuration
 
@@ -186,20 +192,14 @@ sql:
 Generate `atlas.hcl` in the output directory:
 
 ```hcl
-data "external_schema" "sqlc" {
-  program = [
-    "atlas-provider-sqlc",
-    "load",
-    "--dialect", "postgres",
-    "--config", "file://sqlc.yaml",
-  ]
-}
-
 env "local" {
-  src = data.external_schema.sqlc.url
-  dev = "docker://postgres/17/dev?search_path=public"
+  src = [
+    "file://sql/baseline.sql",
+    "file://sql/schema.sql",
+  ]
+  dev = "docker://postgres/17-alpine/dev"
   migration {
-    dir = "file://sql/migrations"
+    dir = "file://migrations"
   }
 }
 ```
@@ -221,6 +221,7 @@ CREATE SCHEMA IF NOT EXISTS public;
   │   ├── baseline.sql
   │   └── queries/
   │       └── <entity>.sql
+  ├── migrations/
   ├── sqlc.yaml
   └── atlas.hcl
   ```

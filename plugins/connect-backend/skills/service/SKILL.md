@@ -20,7 +20,8 @@ You are generating Connect-RPC service `.proto` files from entity message defini
 4. Resolve the package path from the proto file's `package` declaration:
    - The proto package segments map directly to the folder path: `acme.inventory.v1` becomes the proto directory `protos/acme/inventory/v1/` (or wherever the source protos live)
    - Place generated service `.proto` files alongside the entity proto files in the same directory
-   - The `go_package` option must match the convention: `<module>/internal/<provider>/<domain>/<version>;<alias>` where alias concatenates domain and version (e.g. `inventoryv1`)
+   - Read the `go_package` option from the existing proto files and reuse it exactly for generated service protos
+   - If no existing `go_package` exists, follow the convention used by the project's proto generation config (e.g. `buf.gen.yaml`) — the proto Go package path is typically separate from the internal application package path
 
 ## Codebase Assessment
 
@@ -160,8 +161,9 @@ import "google/protobuf/field_mask.proto";
 option go_package = "<go_package>";
 
 message Update<Model>Request {
-  <Model> item = 1;
-  google.protobuf.FieldMask update_mask = 2;
+  string id = 1;
+  <Model> item = 2;
+  google.protobuf.FieldMask update_mask = 3;
 }
 
 message Update<Model>Response {

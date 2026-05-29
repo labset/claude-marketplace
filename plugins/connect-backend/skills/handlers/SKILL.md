@@ -8,6 +8,14 @@ disable-model-invocation: true
 
 You are generating Connect-RPC handler implementations for proto services. Your goal is to read service definitions and sqlc-generated stores, then produce handler structs, proto-to-DB mappers, and RPC implementations.
 
+## Prerequisites
+
+This skill requires artifacts from prior skills:
+- **Service proto files** from `/service` — `service_*.proto` and `rpc_*.proto` files defining RPCs and request/response types
+- **sqlc-generated code** from `/schema` + `sqlc generate` — the `db/` package with `Queries`, model types, and query methods
+
+If these do not exist, inform the user which skills to run first.
+
 ## Setup
 
 1. Determine the source:
@@ -79,7 +87,7 @@ import (
     "connectrpc.com/connect"
     "github.com/jackc/pgx/v5/pgxpool"
 
-    "<module>/db"
+    "<module>/internal/<provider>/<domain>/<version>/db"
     <protoAlias> "<protoImport>"
     <connectAlias> "<connectImport>"
 )
@@ -226,11 +234,11 @@ func (h *<modelLower>Handler) Get<Model>(
 
 ### List (`rpc_list_<entity>.go`)
 
-Implement cursor-based pagination:
+Implement cursor-based pagination using ascending ID order with a zero UUID sentinel:
 - Default `page_size` to 50 if not set or <= 0
 - Decode `page_token` from base64 to get the cursor UUID
-- Use `List<Model>sPaginated` query with cursor and page_size
-- If no page_token, use `List<Model>s` with LIMIT
+- Always use `List<Model>sPaginated` — pass the zero UUID (`00000000-0000-0000-0000-000000000000`) for the first page
+- The SQL query handles the sentinel: `(@cursor::uuid = '00000000...'::uuid OR id > @cursor)`
 - Set `next_page_token` to base64-encoded last UUID if returned rows == page_size
 
 ```go
@@ -243,28 +251,23 @@ func (h *<modelLower>Handler) List<Model>s(
         pageSize = 50
     }
 
-    var rows []db.<DBType>
-    var err error
-
+    cursor := uuid.Nil
     if token := req.Msg.GetPageToken(); token != "" {
         cursorBytes, decErr := base64.StdEncoding.DecodeString(token)
         if decErr != nil {
             return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid page token"))
         }
-        cursor, parseErr := uuid.FromString(string(cursorBytes))
+        parsed, parseErr := uuid.FromString(string(cursorBytes))
         if parseErr != nil {
             return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid page token"))
         }
-        rows, err = h.store.List<Model>sPaginated(ctx, db.List<Model>sPaginatedParams{
-            ID:    cursor,
-            Limit: pageSize,
-        })
-    } else {
-        rows, err = h.store.List<Model>sPaginated(ctx, db.List<Model>sPaginatedParams{
-            ID:    uuid.Must(uuid.FromString("ffffffff-ffff-ffff-ffff-ffffffffffff")),
-            Limit: pageSize,
-        })
+        cursor = parsed
     }
+
+    rows, err := h.store.List<Model>sPaginated(ctx, db.List<Model>sPaginatedParams{
+        Cursor:   cursor,
+        PageSize: pageSize,
+    })
     if err != nil {
         return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("list <model>s: %w", err))
     }
@@ -287,8 +290,9 @@ func (h *<modelLower>Handler) List<Model>s(
 ### Update (`rpc_update_<entity>.go`)
 
 Implement partial updates via FieldMask:
-- Fetch current row first
-- Apply only masked fields from the request, keep unmasked fields from current row
+- Extract ID from the top-level `id` field on the request (not from `item.entity`)
+- Fetch current row to preserve unmasked fields
+- Start from the request item's values, then for fields NOT in the mask, fall back to current DB values
 - FieldMask paths use proto snake_case field names
 
 ```go
@@ -296,7 +300,7 @@ func (h *<modelLower>Handler) Update<Model>(
     ctx context.Context,
     req *connect.Request[<protoAlias>.Update<Model>Request],
 ) (*connect.Response[<protoAlias>.Update<Model>Response], error) {
-    id, err := uuid.FromString(req.Msg.GetItem().GetEntity().GetId())
+    id, err := uuid.FromString(req.Msg.GetId())
     if err != nil {
         return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid id: %w", err))
     }
@@ -309,18 +313,23 @@ func (h *<modelLower>Handler) Update<Model>(
         return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("get <model>: %w", err))
     }
 
-    // Build update params starting from current values
-    params := <modelLower>FromUpdate(<modelLower>ToProto(current), id)
+    // Start from request item values
+    params := <modelLower>FromUpdate(req.Msg.GetItem(), id)
 
-    // Apply masked fields from request
+    // For fields NOT in the mask, preserve current DB values
     mask := req.Msg.GetUpdateMask()
-    if mask != nil {
+    if mask != nil && len(mask.GetPaths()) > 0 {
+        masked := make(map[string]bool, len(mask.GetPaths()))
         for _, path := range mask.GetPaths() {
-            switch path {
-            // case "<field_snake>":
-            //     params.<FieldPascal> = <mapped value from req.Msg.GetItem()>
-            }
+            masked[path] = true
         }
+        currentProto := <modelLower>ToProto(current)
+        currentParams := <modelLower>FromUpdate(currentProto, id)
+        // For each field, if not in mask, use currentParams value instead
+        // switch on field names:
+        // if !masked["<field_snake>"] {
+        //     params.<FieldPascal> = currentParams.<FieldPascal>
+        // }
     }
 
     row, err := h.store.Update<Model>(ctx, params)
