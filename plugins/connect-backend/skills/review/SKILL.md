@@ -104,7 +104,35 @@ Verify that layers are consistent with each other:
 - Tool methods must call the correct handler RPC methods
 - Tool names must match the operations available in the service
 
-## Check 5: Structural Completeness
+## Check 5: Validation Coverage
+
+Verify that proto validation annotations are properly applied:
+
+### Request-level validation
+- All `string id` fields on request messages must have `[(buf.validate.field).string.uuid = true]`
+- `page_size` fields must have bounded range constraints (e.g. `int32 = {gte: 0, lte: 100}`)
+- `item` fields on Create and Update requests should have `[(buf.validate.field).required = true]`
+
+### Repeated field bounds
+- All `repeated` fields on **request messages** must have `(buf.validate.field).repeated.max_items` — flag any that are unbounded
+- All `repeated` fields on **entity model messages** should have `max_items` constraints — flag any that are unbounded and ask whether a limit should be added
+- `FieldMask` paths are implicitly repeated — check whether update masks are bounded
+
+### String field bounds
+- String fields that represent user input (names, descriptions, URLs, etc.) should have `max_len` constraints
+- Flag string fields without `max_len` as informational — not every string needs a bound, but the user should consciously decide
+
+### Enum validation
+- Enum fields should have `(buf.validate.field).enum.defined_only = true` to reject unknown values
+- Flag enum fields without this annotation
+
+### Server-side enforcement
+- If `buf.validate` annotations are present, check that `api/interceptor_validate.go` exists
+- Verify the validation interceptor is applied to handler constructors (check for `protovalidate` import in the `api/` package)
+
+Report unbounded repeated fields as **warnings** (convention violation that could enable abuse).
+
+## Check 6: Structural Completeness
 
 For each entity, verify that all adopted layers are complete:
 

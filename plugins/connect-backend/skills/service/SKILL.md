@@ -84,7 +84,23 @@ Only include RPCs for the operations the user selected.
 
 ## Phase 2: Request/Response Types
 
-For each operation, generate `rpc_<operation>_<entity_snake>.proto`:
+For each operation, generate `rpc_<operation>_<entity_snake>.proto`.
+
+All RPC protos must import `buf/validate/validate.proto` when they contain validation annotations. Apply `buf.validate` rules to enforce input constraints at the proto level.
+
+### Validation rules
+
+Apply these validation annotations consistently:
+
+| Field type | Annotation | Purpose |
+|---|---|---|
+| `string id` | `[(buf.validate.field).string.uuid = true]` | Ensure IDs are valid UUIDs |
+| `int32 page_size` | `[(buf.validate.field).int32 = {gte: 0, lte: 100}]` | Bound page size to prevent oversized responses |
+| `repeated` fields on requests | `[(buf.validate.field).repeated.max_items = <limit>]` | Prevent unbounded request payloads |
+| `string` fields with known bounds | `[(buf.validate.field).string.max_len = <limit>]` | Prevent oversized string inputs |
+| `FieldMask update_mask` | `[(buf.validate.field).repeated.max_items = 50]` | Bound the number of fields in an update mask |
+
+For entity model messages: if the model contains `repeated` fields, add `max_items` constraints appropriate to the domain. Ask the user for sensible limits if unclear — do not leave repeated fields unbounded.
 
 ### Create
 
@@ -94,11 +110,12 @@ syntax = "proto3";
 package <proto_package>;
 
 import "<path_to_models_proto>";
+import "buf/validate/validate.proto";
 
 option go_package = "<go_package>";
 
 message Create<Model>Request {
-  <Model> item = 1;
+  <Model> item = 1 [(buf.validate.field).required = true];
 }
 
 message Create<Model>Response {
@@ -114,11 +131,12 @@ syntax = "proto3";
 package <proto_package>;
 
 import "<path_to_models_proto>";
+import "buf/validate/validate.proto";
 
 option go_package = "<go_package>";
 
 message Get<Model>Request {
-  string id = 1;
+  string id = 1 [(buf.validate.field).string.uuid = true];
 }
 
 message Get<Model>Response {
@@ -134,11 +152,12 @@ syntax = "proto3";
 package <proto_package>;
 
 import "<path_to_models_proto>";
+import "buf/validate/validate.proto";
 
 option go_package = "<go_package>";
 
 message List<Model>sRequest {
-  int32 page_size = 1;
+  int32 page_size = 1 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
   string page_token = 2;
 }
 
@@ -156,13 +175,14 @@ syntax = "proto3";
 package <proto_package>;
 
 import "<path_to_models_proto>";
+import "buf/validate/validate.proto";
 import "google/protobuf/field_mask.proto";
 
 option go_package = "<go_package>";
 
 message Update<Model>Request {
-  string id = 1;
-  <Model> item = 2;
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  <Model> item = 2 [(buf.validate.field).required = true];
   google.protobuf.FieldMask update_mask = 3;
 }
 
@@ -178,16 +198,43 @@ syntax = "proto3";
 
 package <proto_package>;
 
+import "buf/validate/validate.proto";
+
 option go_package = "<go_package>";
 
 message Delete<Model>Request {
-  string id = 1;
+  string id = 1 [(buf.validate.field).string.uuid = true];
 }
 
 message Delete<Model>Response {}
 ```
 
-## Phase 3: Verify
+## Phase 3: Entity Model Validation
+
+After generating the RPC protos, review the entity model messages for fields that need validation constraints. For each entity message:
+
+1. **Repeated fields**: add `(buf.validate.field).repeated.max_items` to prevent unbounded collections. Ask the user for appropriate limits based on the domain.
+2. **String fields**: consider adding `(buf.validate.field).string.max_len` for fields that should have bounded length (names, descriptions, URLs, etc.)
+3. **Enum fields**: add `(buf.validate.field).enum.defined_only = true` to reject unknown enum values
+4. **Nested messages with repeated fields**: recursively check nested messages for unbounded collections
+
+Present the proposed validation annotations to the user for confirmation before modifying model proto files.
+
+### Example
+
+For a `Product` message with a `repeated string tags` field:
+
+```protobuf
+message Product {
+  labset.data.v1.Entity entity = 1;
+  string name = 2 [(buf.validate.field).string.max_len = 255];
+  string description = 3 [(buf.validate.field).string.max_len = 5000];
+  repeated string tags = 4 [(buf.validate.field).repeated.max_items = 20];
+  ProductStatus status = 5 [(buf.validate.field).enum.defined_only = true];
+}
+```
+
+## Phase 4: Verify
 
 - Confirm all generated files follow the naming convention:
   ```
@@ -202,13 +249,20 @@ message Delete<Model>Response {}
 - Verify import paths are correct relative to the project's proto root
 - Verify the `go_package` option matches the existing proto files
 - Verify the `package` declaration matches the existing proto files
-- Present a summary of generated services and RPCs to the user
+- Verify all `id` fields have `buf.validate` UUID constraint
+- Verify `page_size` fields have bounded range constraints
+- Verify `repeated` fields on request messages have `max_items` constraints
+- Verify entity model `repeated` fields have been reviewed for bounds
+- Present a summary of generated services, RPCs, and validation rules to the user
 
 ## Rules
 
 - Always read existing proto files to extract the correct `package` and `go_package` values
-- Do not modify existing proto files (models, refs, etc.)
+- Do not modify existing proto files (models, refs, etc.) without presenting proposed validation annotations to the user first
 - If a service proto already exists, ask the user whether to regenerate or skip
-- Use UUID validation on `id` fields by convention (the handler layer enforces this)
+- Always use `buf/validate/validate.proto` for input validation — do not rely solely on handler-level checks
+- Never leave `repeated` fields on request messages unbounded — always add `max_items`
+- Never leave `id` fields without UUID validation
 - Follow the exact file naming: `service_<entity_snake>.proto` and `rpc_<operation>_<entity_snake>.proto`
 - Each RPC message type goes in its own file to keep protos modular
+- If the project does not yet depend on `buf/validate`, inform the user to add it to their `buf.yaml` deps
