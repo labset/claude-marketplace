@@ -27,6 +27,45 @@ You are generating Connect-RPC handler implementations for proto services. Your 
    - **connectImport**: `<protoImport>/<protoAlias>connect` (e.g. `github.com/acme/inventory/v1/inventoryv1connect`)
    - **connectAlias**: `<protoAlias>connect`
 
+## Codebase Assessment
+
+Before generating anything, scan the existing codebase to understand what already exists and identify divergences from the target conventions. Present your findings to the user before proceeding.
+
+### What to look for
+
+1. **Existing handler implementations**:
+   - Search for existing Connect-RPC, gRPC, or HTTP handler code
+   - Check whether handlers use the `Deps` struct + constructor pattern or a different wiring approach (e.g. direct struct init, dependency injection framework)
+   - Check whether handlers embed `Unimplemented*ServiceHandler` or use a different base
+   - Look for existing RPC method implementations and their error handling patterns
+
+2. **Existing data access layer**:
+   - Check whether the project uses sqlc-generated stores, raw SQL, an ORM, or a repository pattern
+   - Look for existing mapper/converter functions between database types and proto types
+   - Check whether the `db/` package follows sqlc conventions or uses a different structure
+   - Identify the `Queries` type name and any schema prefixes on generated types (read `db/models.go` if it exists)
+
+3. **Existing package layout**:
+   - Check whether handler code lives in `api/`, `handler/`, `server/`, `service/`, or another location
+   - Check whether there is one handler file per entity or a monolithic handler
+   - Check file naming: `handler_<entity>.go` vs `<entity>_handler.go` vs other patterns
+
+4. **Existing error handling**:
+   - Check whether existing code uses `connect.NewError` with status codes or a different error approach
+   - Look for existing duplicate-key detection (pgconn error code `23505`) or not-found handling
+
+### What to present to the user
+
+Summarise your findings as a short assessment:
+- **Matches**: handler patterns that already align (e.g. already uses `Deps` + constructor, already embeds `Unimplemented`)
+- **Divergences**: different handler wiring, different package location, different error patterns, ORM instead of sqlc, etc.
+- **Proposed plan**: for each divergence, suggest one of:
+  - **Adopt as-is**: follow the project's existing handler pattern (e.g. handlers live in `server/` — generate there instead of `api/`)
+  - **Incremental refactor**: suggest specific changes (e.g. "extract handler per entity from monolithic handler", "add `Deps` struct for dependency injection")
+  - **Generate alongside**: generate new handlers in `api/` alongside existing code, letting the user migrate at their own pace
+
+Ask the user to confirm the plan before proceeding to generation. If no existing handler code exists, skip the assessment and proceed directly.
+
 ## Phase 1: Handler Struct
 
 Generate `api/handler_<entity_snake>.go` for each entity service:

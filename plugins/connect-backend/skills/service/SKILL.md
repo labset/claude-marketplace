@@ -22,6 +22,40 @@ You are generating Connect-RPC service `.proto` files from entity message defini
    - Place generated service `.proto` files alongside the entity proto files in the same directory
    - The `go_package` option must match the convention: `<module>/internal/<provider>/<domain>/<version>;<alias>` where alias concatenates domain and version (e.g. `inventoryv1`)
 
+## Codebase Assessment
+
+Before generating anything, scan the existing codebase to understand what already exists and identify divergences from the target conventions. Present your findings to the user before proceeding.
+
+### What to look for
+
+1. **Existing service definitions**:
+   - Search for existing `service` declarations in `.proto` files
+   - Check whether services are defined inline in the same file as messages or in separate files
+   - Check whether existing RPCs follow the Create/Get/List/Update/Delete naming convention
+   - Look for existing request/response message types and their structure
+
+2. **Proto file organisation**:
+   - Check whether proto files are split by concern (models, refs, services, RPCs) or monolithic
+   - Check whether the `go_package` option follows the `<module>/internal/<provider>/<domain>/<version>;<alias>` convention
+   - Identify any buf.yaml, buf.gen.yaml, or protoc configuration
+
+3. **Existing RPC patterns**:
+   - Check whether existing services use Connect-RPC, gRPC-Go, or Twirp
+   - Look for existing request/response patterns (do they use `item` field? `FieldMask` for updates? cursor-based pagination?)
+   - Identify custom RPCs beyond standard CRUD
+
+### What to present to the user
+
+Summarise your findings as a short assessment:
+- **Matches**: proto files that already follow the target conventions (separate service files, modular RPC messages, etc.)
+- **Divergences**: monolithic proto files, inline service definitions, non-standard RPC patterns, different pagination approaches, etc.
+- **Proposed plan**: for each divergence, suggest one of:
+  - **Adopt as-is**: the existing pattern works and the skill should follow it (e.g. the project uses offset pagination — keep it)
+  - **Incremental refactor**: suggest extracting services into separate files, renaming RPCs to match conventions, or adding missing operations
+  - **Generate alongside**: generate new service protos in the target layout alongside existing ones
+
+Ask the user to confirm the plan before proceeding to generation. If no existing service protos exist, skip the assessment and proceed directly.
+
 ## Phase 1: Service Definition
 
 For each entity, generate `service_<entity_snake>.proto`:

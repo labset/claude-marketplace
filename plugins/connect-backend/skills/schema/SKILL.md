@@ -35,6 +35,40 @@ You are generating the database layer for a Connect-RPC backend. Your goal is to
    - If the project already has generated code from a previous skill run, use the same path
 4. Read `go.mod` to determine the Go module path — all Go imports for subpackages use `<module>/internal/<provider>/<domain>/<version>/<subpackage>`
 
+## Codebase Assessment
+
+Before generating anything, scan the existing codebase to understand what already exists and identify divergences from the target conventions. Present your findings to the user before proceeding.
+
+### What to look for
+
+1. **Existing database layer**:
+   - Search for existing SQL files (`*.sql`), migration directories, or ORM usage (e.g. GORM, Ent, sqlboiler)
+   - Check for existing `sqlc.yaml` or `sqlc.json` configuration
+   - Check for existing Atlas, Flyway, golang-migrate, or goose migration setups
+   - Look for existing database connection code to understand the driver in use (pgx, database/sql, etc.)
+
+2. **Existing package layout**:
+   - Check whether the project uses `internal/` or a flat layout
+   - Check whether existing Go packages follow the proto package path convention (`internal/<provider>/<domain>/<version>/`)
+   - If not, identify the current layout and how it diverges
+
+3. **Existing schema definitions**:
+   - Look for existing CREATE TABLE statements, model structs, or schema definitions
+   - Check whether tables use the expected entity columns (id UUID, created_at, updated_at, deleted_at)
+   - Identify any existing tables that correspond to proto messages
+
+### What to present to the user
+
+Summarise your findings as a short assessment:
+- **Matches**: aspects of the existing codebase that already align with the target conventions
+- **Divergences**: aspects that differ — different package layout, different migration tool, missing soft-delete columns, different naming conventions, etc.
+- **Proposed plan**: for each divergence, suggest one of:
+  - **Adopt as-is**: the existing pattern is fine and the skill should adapt to it (e.g. the project uses `golang-migrate` instead of Atlas — keep it)
+  - **Incremental refactor**: suggest a specific, scoped change to move toward the convention (e.g. "add `deleted_at` column to existing tables for soft-delete support")
+  - **Generate alongside**: generate the new code in the target layout and let existing code coexist until the user is ready to migrate
+
+Ask the user to confirm the plan before proceeding to generation. If the codebase is greenfield (no existing database layer), skip the assessment and proceed directly.
+
 ## Phase 1: Schema Generation
 
 Generate `sql/schema.sql` in the output directory.

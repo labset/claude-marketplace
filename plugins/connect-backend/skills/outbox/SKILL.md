@@ -21,6 +21,39 @@ You are adding the transactional outbox pattern to existing Connect-RPC handlers
 4. Read `go.mod` for module path and verify `github.com/riverqueue/river` is a dependency
    - If River is not in `go.mod`, inform the user they need to add it: `go get github.com/riverqueue/river`
 
+## Codebase Assessment
+
+Before generating anything, scan the existing codebase to understand what already exists and identify divergences from the target conventions. Present your findings to the user before proceeding.
+
+### What to look for
+
+1. **Existing event/messaging patterns**:
+   - Search for existing event publishing code (direct Kafka producers, NATS, RabbitMQ, cloud pub/sub, etc.)
+   - Check whether mutating handlers already emit events and how (inline publish, after-commit hook, etc.)
+   - Look for existing event types or structs that represent domain events
+
+2. **Existing transaction handling**:
+   - Check whether mutating RPCs already use database transactions
+   - If so, check how transactions are managed (inline `pool.Begin`, middleware, repository pattern)
+   - Check whether the store supports `WithTx()` for transactional queries
+
+3. **Existing job queue usage**:
+   - Check for River, Temporal, go-task, or other async job frameworks
+   - If River is already in use, check how workers are registered and event args are structured
+   - Look for existing outbox table patterns (e.g. a manual `outbox` table with polling)
+
+### What to present to the user
+
+Summarise your findings as a short assessment:
+- **Matches**: existing patterns that align (e.g. handlers already use transactions, River is already a dependency)
+- **Divergences**: events published inline without transactional guarantees, different job queue, no existing event types, etc.
+- **Proposed plan**: for each divergence, suggest one of:
+  - **Adopt as-is**: the existing event system works and the skill should integrate with it (e.g. "keep existing Kafka producer, add transactional outbox alongside it")
+  - **Incremental refactor**: suggest specific changes (e.g. "wrap existing inline Kafka publish in a transaction with River outbox for delivery guarantees")
+  - **Generate alongside**: generate outbox event args and modify only the handlers the user selects, leaving others untouched
+
+Ask the user to confirm the plan before proceeding to generation. If no existing event/messaging code exists, skip the assessment and proceed directly.
+
 ## Phase 1: Event Args
 
 Generate `outbox/event_<operation>_<entity_snake>.go` for each mutating operation (create, update, delete):

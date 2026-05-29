@@ -26,6 +26,39 @@ You are generating Kafka streaming infrastructure from outbox events. Your goal 
 6. Verify `github.com/segmentio/kafka-go` is in `go.mod`
    - If not, inform the user: `go get github.com/segmentio/kafka-go`
 
+## Codebase Assessment
+
+Before generating anything, scan the existing codebase to understand what already exists and identify divergences from the target conventions. Present your findings to the user before proceeding.
+
+### What to look for
+
+1. **Existing Kafka infrastructure**:
+   - Search for existing Kafka producer/consumer code (segmentio/kafka-go, confluent-kafka-go, sarama, etc.)
+   - Check for existing topic naming conventions
+   - Look for existing consumer group configurations and naming patterns
+
+2. **Existing worker/job processing**:
+   - Check whether River workers already exist and how they are registered
+   - Look for existing worker patterns: do they publish to Kafka, call downstream services, or do something else?
+   - Check for existing `EventEnvelope` or similar event wrapper types
+
+3. **Existing consumer patterns**:
+   - Check whether consumers use handler interfaces, callback functions, or a different pattern
+   - Look for existing consumer implementations to understand logging, error handling, and retry conventions
+   - Check for existing consumer group ID naming conventions
+
+### What to present to the user
+
+Summarise your findings as a short assessment:
+- **Matches**: existing patterns that align (e.g. already uses segmentio/kafka-go, topic naming matches convention)
+- **Divergences**: different Kafka client, different topic naming, different consumer patterns, existing workers that publish differently, etc.
+- **Proposed plan**: for each divergence, suggest one of:
+  - **Adopt as-is**: follow the project's existing Kafka conventions (e.g. "keep existing topic naming scheme `<service>.<entity>.v1` instead of `<domain>.<entity>.events.<version>`")
+  - **Incremental refactor**: suggest specific changes (e.g. "migrate from sarama to segmentio/kafka-go", "consolidate consumer group naming")
+  - **Generate alongside**: generate new workers and consumers alongside existing ones, letting the user migrate consumers incrementally
+
+Ask the user to confirm the plan before proceeding to generation. If no existing Kafka/streaming code exists, skip the assessment and proceed directly.
+
 ## Phase 1: Event Envelope
 
 Generate `workers/envelope.go` (shared across all entities):
