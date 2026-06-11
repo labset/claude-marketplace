@@ -21,427 +21,71 @@ If these do not exist, inform the user which skills to run first.
 1. Determine the source:
    - If the user provides a path (e.g. `/handlers protos/acme/inventory/v1/`), use it
    - Otherwise, search for `service_*.proto` files and ask the user which services to implement
-2. Read the service proto files to understand available RPCs
-3. Read the sqlc-generated code in the `db/` package within the output directory to understand available queries and types
-4. Read `go.mod` to determine the Go module path
-5. Resolve the package path from the proto file's `package` declaration:
-   - The proto package segments map directly to the folder path: `acme.inventory.v1` becomes `internal/acme/inventory/v1/`
-   - The output directory for handlers is `internal/<provider>/<domain>/<version>/api/`
-   - The `db/` package produced by `/schema` lives at `internal/<provider>/<domain>/<version>/db/`
-   - All Go imports for sibling subpackages use `<module>/internal/<provider>/<domain>/<version>/<subpackage>`
-6. Derive import paths from the proto file's `go_package` option:
-   - **protoImport**: the full Go import path (e.g. `github.com/acme/inventory/v1`)
-   - **protoAlias**: the package alias (e.g. `inventoryv1`)
-   - **connectImport**: `<protoImport>/<protoAlias>connect` (e.g. `github.com/acme/inventory/v1/inventoryv1connect`)
-   - **connectAlias**: `<protoAlias>connect`
+2. Read the service proto files, sqlc-generated `db/` package (`models.go` and query files), and `go.mod`
+3. Resolve paths from the proto `package` declaration:
+   - Output directory for handlers: `internal/<provider>/<domain>/<version>/api/`
+   - DB package: `internal/<provider>/<domain>/<version>/db/`
+4. Derive Go import paths from the proto `go_package` option
 
 ## Codebase Assessment
 
-Before generating anything, scan the existing codebase to understand what already exists and identify divergences from the target conventions. Present your findings to the user before proceeding.
+Before generating, scan for existing handler patterns, data access layer, and package layout. If existing code is found, present divergences from the target conventions and a proposed plan (adopt existing patterns, suggest incremental refactors, or generate alongside). Ask the user to confirm before proceeding. If no existing handler code exists, skip and proceed directly.
 
-### What to look for
+## Generation
 
-1. **Existing handler implementations**:
-   - Search for existing Connect-RPC, gRPC, or HTTP handler code
-   - Check whether handlers use the `Deps` struct + constructor pattern or a different wiring approach (e.g. direct struct init, dependency injection framework)
-   - Check whether handlers embed `Unimplemented*ServiceHandler` or use a different base
-   - Look for existing RPC method implementations and their error handling patterns
+### Handler struct
 
-2. **Existing data access layer**:
-   - Check whether the project uses sqlc-generated stores, raw SQL, an ORM, or a repository pattern
-   - Look for existing mapper/converter functions between database types and proto types
-   - Check whether the `db/` package follows sqlc conventions or uses a different structure
-   - Identify the `Queries` type name and any schema prefixes on generated types (read `db/models.go` if it exists)
+Generate `api/handler_<entity_snake>.go` per entity service with:
+- A `Deps` struct holding `*pgxpool.Pool`
+- A private handler struct embedding `Unimplemented*ServiceHandler` and holding `*db.Queries`
+- A public constructor returning `(string, http.Handler)` via the connect-generated `New*ServiceHandler`
 
-3. **Existing package layout**:
-   - Check whether handler code lives in `api/`, `handler/`, `server/`, `service/`, or another location
-   - Check whether there is one handler file per entity or a monolithic handler
-   - Check file naming: `handler_<entity>.go` vs `<entity>_handler.go` vs other patterns
+### Mappers
 
-4. **Existing error handling**:
-   - Check whether existing code uses `connect.NewError` with status codes or a different error approach
-   - Look for existing duplicate-key detection (pgconn error code `23505`) or not-found handling
+Generate `api/mapper_<entity_snake>.go` with conversion functions between sqlc DB types and proto types:
+- `<entity>ToProto` — DB row to proto message
+- `<entity>FromCreate` — create request to sqlc params
+- `<entity>FromUpdate` — update request to sqlc params
 
-### What to present to the user
+Derive field mappings from the actual proto message fields and sqlc-generated types in `db/models.go`. Convert snake_case to PascalCase respecting Go initialisms (`category_id` -> `CategoryID`).
 
-Summarise your findings as a short assessment:
-- **Matches**: handler patterns that already align (e.g. already uses `Deps` + constructor, already embeds `Unimplemented`)
-- **Divergences**: different handler wiring, different package location, different error patterns, ORM instead of sqlc, etc.
-- **Proposed plan**: for each divergence, suggest one of:
-  - **Adopt as-is**: follow the project's existing handler pattern (e.g. handlers live in `server/` — generate there instead of `api/`)
-  - **Incremental refactor**: suggest specific changes (e.g. "extract handler per entity from monolithic handler", "add `Deps` struct for dependency injection")
-  - **Generate alongside**: generate new handlers in `api/` alongside existing code, letting the user migrate at their own pace
+### RPC implementations
 
-Ask the user to confirm the plan before proceeding to generation. If no existing handler code exists, skip the assessment and proceed directly.
+Generate one file per RPC: `api/rpc_<operation>_<entity_snake>.go`. Only generate RPCs that have corresponding service definitions.
 
-## Phase 1: Handler Struct
+Follow these conventions:
+- **Error codes**: `CodeAlreadyExists` for duplicate key (`pgconn.PgError` code `23505`), `CodeNotFound` for `pgx.ErrNoRows`, `CodeInvalidArgument` for bad input, `CodeInternal` for everything else
+- **Create**: generate a UUID v4, set timestamps, call the store, handle duplicate key
+- **Get**: parse UUID from request, call the store, handle not found
+- **List**: cursor-based pagination using the store's paginated query, base64-encoded page tokens, default page size of 50
+- **Update**: support partial updates via FieldMask — fetch current row, apply only masked fields from the request, preserve unmasked fields from the DB
+- **Delete**: soft delete via the store, return `CodeNotFound` if no rows affected
 
-Generate `api/handler_<entity_snake>.go` for each entity service:
+### Validation
+
+Do not generate a custom validation interceptor. Use `connectrpc.com/validate` as a handler option when wiring up the service:
 
 ```go
-package api
+import "connectrpc.com/validate"
 
-import (
-    "net/http"
-
-    "connectrpc.com/connect"
-    "github.com/jackc/pgx/v5/pgxpool"
-
-    "<module>/internal/<provider>/<domain>/<version>/db"
-    <protoAlias> "<protoImport>"
-    <connectAlias> "<connectImport>"
-)
-
-type <Model>Deps struct {
-    Pool *pgxpool.Pool
-}
-
-type <modelLower>Handler struct {
-    <connectAlias>.Unimplemented<Model>ServiceHandler
-    store *db.Queries
-}
-
-func New<Model>ServiceHandler(deps <Model>Deps, opts ...connect.HandlerOption) (string, http.Handler) {
-    h := &<modelLower>Handler{
-        store: db.New(deps.Pool),
-    }
-    return <connectAlias>.New<Model>ServiceHandler(h, opts...)
-}
-```
-
-Where `<modelLower>` is the model name with the first letter lowercased (e.g. `Product` becomes `productHandler`).
-
-## Phase 2: Mapper Functions
-
-Generate `api/mapper_<entity_snake>.go` with proto-to-DB and DB-to-proto conversion functions:
-
-```go
-package api
-
-import (
-    "github.com/gofrs/uuid/v5"
-    "github.com/jackc/pgx/v5/pgtype"
-    "google.golang.org/protobuf/types/known/timestamppb"
-
-    pluginv1 "path/to/clarity/plugin/v1"
-    "<module>/db"
-    <protoAlias> "<protoImport>"
-)
-
-// <modelLower>ToProto converts a database row to a proto message.
-func <modelLower>ToProto(row db.<DBPrefix><Model>) *<protoAlias>.<Model> {
-    return &<protoAlias>.<Model>{
-        Entity: &pluginv1.Entity{
-            Id:        row.ID.String(),
-            CreatedAt: timestamppb.New(row.CreatedAt.Time),
-            UpdatedAt: timestamppb.New(row.UpdatedAt.Time),
-        },
-        // Map each field:
-        // - Regular fields: row.<SQLCName>
-        // - Ref fields: &<RefType>{Id: row.<FieldName>ID.String()}
-        // - Enum fields: <EnumType>(<EnumType>_value[row.<SQLCName>])
-    }
-}
-
-// <modelLower>FromCreate converts a create request to database params.
-func <modelLower>FromCreate(msg *<protoAlias>.<Model>, id uuid.UUID, now pgtype.Timestamptz) db.Create<Model>Params {
-    return db.Create<Model>Params{
-        ID:        id,
-        CreatedAt: now,
-        UpdatedAt: now,
-        // Map each user field from msg
-    }
-}
-
-// <modelLower>FromUpdate converts an update request to database params.
-func <modelLower>FromUpdate(msg *<protoAlias>.<Model>, id uuid.UUID) db.Update<Model>Params {
-    return db.Update<Model>Params{
-        ID: id,
-        // Map each user field from msg
-    }
-}
-```
-
-### SQLC name convention
-
-When referencing sqlc-generated field names, convert snake_case to PascalCase respecting Go initialisms:
-- `category_id` becomes `CategoryID` (not `CategoryId`)
-- `name` becomes `Name`
-- `http_url` becomes `HTTPURL`
-
-### DB prefix
-
-The sqlc-generated types may have a prefix derived from the schema name. Check the actual sqlc output in `db/models.go` to determine the exact type names (e.g. `db.AcmeInventoryV1Product` or just `db.Product`).
-
-## Phase 3: RPC Implementations
-
-Generate one file per RPC: `api/rpc_<operation>_<entity_snake>.go`
-
-### Create (`rpc_create_<entity>.go`)
-
-```go
-func (h *<modelLower>Handler) Create<Model>(
-    ctx context.Context,
-    req *connect.Request[<protoAlias>.Create<Model>Request],
-) (*connect.Response[<protoAlias>.Create<Model>Response], error) {
-    id, err := uuid.NewV4()
-    if err != nil {
-        return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("generate id: %w", err))
-    }
-    now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
-    params := <modelLower>FromCreate(req.Msg.GetItem(), id, now)
-
-    row, err := h.store.Create<Model>(ctx, params)
-    if err != nil {
-        var pgErr *pgconn.PgError
-        if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-            return nil, connect.NewError(connect.CodeAlreadyExists, fmt.Errorf("<model> already exists"))
-        }
-        return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("create <model>: %w", err))
-    }
-
-    return connect.NewResponse(&<protoAlias>.Create<Model>Response{
-        Item: <modelLower>ToProto(row),
-    }), nil
-}
-```
-
-### Get (`rpc_get_<entity>.go`)
-
-```go
-func (h *<modelLower>Handler) Get<Model>(
-    ctx context.Context,
-    req *connect.Request[<protoAlias>.Get<Model>Request],
-) (*connect.Response[<protoAlias>.Get<Model>Response], error) {
-    id, err := uuid.FromString(req.Msg.GetId())
-    if err != nil {
-        return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid id: %w", err))
-    }
-
-    row, err := h.store.Get<Model>(ctx, id)
-    if err != nil {
-        if errors.Is(err, pgx.ErrNoRows) {
-            return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("<model> not found"))
-        }
-        return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("get <model>: %w", err))
-    }
-
-    return connect.NewResponse(&<protoAlias>.Get<Model>Response{
-        Item: <modelLower>ToProto(row),
-    }), nil
-}
-```
-
-### List (`rpc_list_<entity>.go`)
-
-Implement cursor-based pagination using ascending ID order with a zero UUID sentinel:
-- Default `page_size` to 50 if not set or <= 0
-- Decode `page_token` from base64 to get the cursor UUID
-- Always use `List<Model>sPaginated` — pass the zero UUID (`00000000-0000-0000-0000-000000000000`) for the first page
-- The SQL query handles the sentinel: `(@cursor::uuid = '00000000...'::uuid OR id > @cursor)`
-- Set `next_page_token` to base64-encoded last UUID if returned rows == page_size
-
-```go
-func (h *<modelLower>Handler) List<Model>s(
-    ctx context.Context,
-    req *connect.Request[<protoAlias>.List<Model>sRequest],
-) (*connect.Response[<protoAlias>.List<Model>sResponse], error) {
-    pageSize := req.Msg.GetPageSize()
-    if pageSize <= 0 {
-        pageSize = 50
-    }
-
-    cursor := uuid.Nil
-    if token := req.Msg.GetPageToken(); token != "" {
-        cursorBytes, decErr := base64.StdEncoding.DecodeString(token)
-        if decErr != nil {
-            return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid page token"))
-        }
-        parsed, parseErr := uuid.FromString(string(cursorBytes))
-        if parseErr != nil {
-            return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid page token"))
-        }
-        cursor = parsed
-    }
-
-    rows, err := h.store.List<Model>sPaginated(ctx, db.List<Model>sPaginatedParams{
-        Cursor:   cursor,
-        PageSize: pageSize,
-    })
-    if err != nil {
-        return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("list <model>s: %w", err))
-    }
-
-    items := make([]*<protoAlias>.<Model>, len(rows))
-    for i, row := range rows {
-        items[i] = <modelLower>ToProto(row)
-    }
-
-    resp := &<protoAlias>.List<Model>sResponse{Items: items}
-    if int32(len(rows)) == pageSize {
-        lastID := rows[len(rows)-1].ID.String()
-        resp.NextPageToken = base64.StdEncoding.EncodeToString([]byte(lastID))
-    }
-
-    return connect.NewResponse(resp), nil
-}
-```
-
-### Update (`rpc_update_<entity>.go`)
-
-Implement partial updates via FieldMask:
-- Extract ID from the top-level `id` field on the request (not from `item.entity`)
-- Fetch current row to preserve unmasked fields
-- Start from the request item's values, then for fields NOT in the mask, fall back to current DB values
-- FieldMask paths use proto snake_case field names
-
-```go
-func (h *<modelLower>Handler) Update<Model>(
-    ctx context.Context,
-    req *connect.Request[<protoAlias>.Update<Model>Request],
-) (*connect.Response[<protoAlias>.Update<Model>Response], error) {
-    id, err := uuid.FromString(req.Msg.GetId())
-    if err != nil {
-        return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid id: %w", err))
-    }
-
-    current, err := h.store.Get<Model>(ctx, id)
-    if err != nil {
-        if errors.Is(err, pgx.ErrNoRows) {
-            return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("<model> not found"))
-        }
-        return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("get <model>: %w", err))
-    }
-
-    // Start from request item values
-    params := <modelLower>FromUpdate(req.Msg.GetItem(), id)
-
-    // For fields NOT in the mask, preserve current DB values
-    mask := req.Msg.GetUpdateMask()
-    if mask != nil && len(mask.GetPaths()) > 0 {
-        masked := make(map[string]bool, len(mask.GetPaths()))
-        for _, path := range mask.GetPaths() {
-            masked[path] = true
-        }
-        currentProto := <modelLower>ToProto(current)
-        currentParams := <modelLower>FromUpdate(currentProto, id)
-        // For each field, if not in mask, use currentParams value instead
-        // switch on field names:
-        // if !masked["<field_snake>"] {
-        //     params.<FieldPascal> = currentParams.<FieldPascal>
-        // }
-    }
-
-    row, err := h.store.Update<Model>(ctx, params)
-    if err != nil {
-        return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("update <model>: %w", err))
-    }
-
-    return connect.NewResponse(&<protoAlias>.Update<Model>Response{
-        Item: <modelLower>ToProto(row),
-    }), nil
-}
-```
-
-### Delete (`rpc_delete_<entity>.go`)
-
-Soft delete via `SoftDelete<Model>` query:
-
-```go
-func (h *<modelLower>Handler) Delete<Model>(
-    ctx context.Context,
-    req *connect.Request[<protoAlias>.Delete<Model>Request],
-) (*connect.Response[<protoAlias>.Delete<Model>Response], error) {
-    id, err := uuid.FromString(req.Msg.GetId())
-    if err != nil {
-        return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid id: %w", err))
-    }
-
-    rows, err := h.store.SoftDelete<Model>(ctx, id)
-    if err != nil {
-        return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("delete <model>: %w", err))
-    }
-    if rows == 0 {
-        return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("<model> not found"))
-    }
-
-    return connect.NewResponse(&<protoAlias>.Delete<Model>Response{}), nil
-}
-```
-
-## Phase 4: Validation Interceptor
-
-If the service protos use `buf.validate` annotations (as generated by `/service`), generate a Connect interceptor that enforces validation server-side. This ensures all requests are validated before reaching the handler, regardless of the client.
-
-Generate `api/interceptor_validate.go`:
-
-```go
-package api
-
-import (
-    "context"
-    "fmt"
-
-    "connectrpc.com/connect"
-    "github.com/bufbuild/protovalidate-go"
-    "google.golang.org/protobuf/proto"
-)
-
-func NewValidationInterceptor() connect.UnaryInterceptorFunc {
-    validator, err := protovalidate.New()
-    if err != nil {
-        panic(fmt.Errorf("create validator: %w", err))
-    }
-    return func(next connect.UnaryFunc) connect.UnaryFunc {
-        return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-            if msg, ok := req.Any().(proto.Message); ok {
-                if err := validator.Validate(msg); err != nil {
-                    return nil, connect.NewError(connect.CodeInvalidArgument, err)
-                }
-            }
-            return next(ctx, req)
-        }
-    }
-}
-```
-
-This interceptor is passed as a `connect.HandlerOption` when constructing handlers:
-
-```go
 opts := []connect.HandlerOption{
-    connect.WithInterceptors(NewValidationInterceptor()),
+    connect.WithInterceptors(validate.NewInterceptor()),
 }
 path, handler := New<Model>ServiceHandler(deps, opts...)
 ```
 
-If `buf.validate` annotations are not present in the protos, skip this phase — handler-level validation (UUID parsing, etc.) is sufficient.
+If `buf.validate` annotations are not present in the protos, skip — handler-level validation (UUID parsing, etc.) is sufficient.
 
-Verify `github.com/bufbuild/protovalidate-go` is in `go.mod`. If not, inform the user: `go get github.com/bufbuild/protovalidate-go`.
+## Verify
 
-## Phase 5: Verify
-
-- Confirm all generated files follow the layout:
-  ```
-  <output_dir>/api/
-  ├── handler_<entity>.go
-  ├── mapper_<entity>.go
-  ├── rpc_create_<entity>.go
-  ├── rpc_get_<entity>.go
-  ├── rpc_list_<entity>.go
-  ├── rpc_update_<entity>.go
-  └── rpc_delete_<entity>.go
-  ```
-- Verify imports resolve correctly against `go.mod` and the sqlc-generated `db/` package
-- Verify the handler embeds the correct `Unimplemented*ServiceHandler`
-- Verify mapper functions reference the correct sqlc types from `db/models.go`
+- Confirm generated files follow the layout: `handler_*.go`, `mapper_*.go`, `rpc_*_*.go` under `api/`
+- Verify imports resolve against `go.mod` and the sqlc `db/` package
+- Verify mapper functions reference the correct sqlc types
 - Present a summary to the user
 
 ## Rules
 
-- Always read the sqlc-generated `db/` package before generating mappers and RPCs to ensure type names match
-- Always read the service proto files to ensure RPC signatures match
+- Always read the sqlc `db/` package and service protos before generating to ensure type names match
 - Only generate RPC files for operations that have corresponding service RPCs
 - If an `api/rpc_*.go` file already exists, do NOT overwrite it (it may contain user customizations)
 - Handler and mapper files may be regenerated (they are structural, not customized)
-- Use the exact error handling patterns: `CodeAlreadyExists` for duplicate key, `CodeNotFound` for missing rows, `CodeInvalidArgument` for bad input, `CodeInternal` for everything else
-- Use `pgconn.PgError` with code `"23505"` for duplicate detection in Create
