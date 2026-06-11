@@ -2,6 +2,55 @@
 
 Claude Code plugin marketplace for the labset org.
 
+## Setup
+
+Register the marketplace (once per user):
+
+```
+/plugin marketplace add labset/claude-marketplace
+```
+
+Install a plugin:
+
+```
+/plugin install spec-delivery@labset-marketplace
+/plugin install orchestrate@labset-marketplace
+/plugin install connect-backend@labset-marketplace
+```
+
+### Updating
+
+Refresh the marketplace to pick up new plugins or updates to existing ones:
+
+```
+/plugin marketplace refresh labset-marketplace
+```
+
+Update an installed plugin to the latest version:
+
+```
+/plugin update spec-delivery@labset-marketplace
+/plugin update orchestrate@labset-marketplace
+/plugin update connect-backend@labset-marketplace
+```
+
+### Auto-prompt for a repo
+
+Add to any repo's `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "labset-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "labset/claude-marketplace"
+      }
+    }
+  }
+}
+```
+
 ## Plugins
 
 ### spec-delivery
@@ -43,52 +92,3 @@ Incrementally scaffold Connect-RPC backends from proto definitions. Each skill b
 | `/review` | Review structural consistency, naming conventions, and cross-layer alignment |
 
 Skills are designed to work incrementally: `/schema` -> `/service` -> `/handlers` -> `/outbox` -> `/streaming` -> `/mcp`. Run `/review` at any point to verify everything holds together. Each skill assesses the existing codebase before generating, so it can adapt to established patterns or suggest incremental refactors toward the target conventions.
-
-## Setup
-
-Register the marketplace (once per user):
-
-```
-/plugin marketplace add labset/claude-marketplace
-```
-
-Install a plugin:
-
-```
-/plugin install spec-delivery@labset-marketplace
-/plugin install connect-backend@labset-marketplace
-/plugin install orchestrate@labset-marketplace
-```
-
-### Updating
-
-Refresh the marketplace to pick up new plugins or updates to existing ones:
-
-```
-/plugin marketplace refresh labset-marketplace
-```
-
-Update an installed plugin to the latest version:
-
-```
-/plugin update spec-delivery@labset-marketplace
-/plugin update connect-backend@labset-marketplace
-/plugin update orchestrate@labset-marketplace
-```
-
-### Auto-prompt for a repo
-
-Add to any repo's `.claude/settings.json`:
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "labset-marketplace": {
-      "source": {
-        "source": "github",
-        "repo": "labset/claude-marketplace"
-      }
-    }
-  }
-}
-```
