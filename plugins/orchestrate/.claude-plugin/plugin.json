@@ -1,0 +1,5 @@
+{
+  "name": "orchestrate",
+  "description": "Agent orchestration layer for spec-delivery: ingest requirements, track status, and run pipeline stages autonomously with machine-readable output",
+  "version": "1.0.0"
+}
