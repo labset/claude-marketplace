@@ -15,6 +15,19 @@ A spec-driven delivery workflow with four skills:
 | `/audit` | Audit spec vs implementation for gaps and divergences |
 | `/review` | Review deferred items and recommend future work |
 
+### orchestrate
+
+Agent orchestration layer for spec-delivery. Adds machine-readable status tracking, structured signaling, and autonomous pipeline execution for use with agent orchestrators.
+
+| Skill | Description |
+|-------|-------------|
+| `/ingest` | Ingest requirements from an external source into a spec, bypassing interactive `/discuss` |
+| `/status` | Report machine-readable JSON status of one or all specs |
+| `/pipeline` | Run the full lifecycle (ingest -> ship -> audit) autonomously with JSON signals at each stage |
+| `/signal` | Write structured state signals (blocked, unblocked, error) to a spec's status.json |
+
+Pipeline states: `ready` -> `shipping` -> `auditing` -> `done` | `audit_failed` | `blocked` | `error`
+
 ### connect-backend
 
 Incrementally scaffold Connect-RPC backends from proto definitions. Each skill builds on the previous layer, producing a consistent codebase structure rooted at `internal/<provider>/<domain>/<version>/`.
@@ -44,6 +57,7 @@ Install a plugin:
 ```
 /plugin install spec-delivery@labset-marketplace
 /plugin install connect-backend@labset-marketplace
+/plugin install orchestrate@labset-marketplace
 ```
 
 ### Updating
@@ -59,6 +73,7 @@ Update an installed plugin to the latest version:
 ```
 /plugin update spec-delivery@labset-marketplace
 /plugin update connect-backend@labset-marketplace
+/plugin update orchestrate@labset-marketplace
 ```
 
 ### Auto-prompt for a repo
