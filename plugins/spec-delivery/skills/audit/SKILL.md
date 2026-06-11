@@ -11,9 +11,9 @@ You are conducting a thorough audit of a spec and its implementation. Your goal 
 ## Setup
 
 1. Determine which spec to audit:
-   - If the user provides arguments (e.g. `/audit specs/2026-04-26-01-generic-crud-api`), use the specified directory
-   - Otherwise, run `ls -d specs/*/` to list existing spec directories and ask the user which one to audit
-2. Read `specs/yyyy-mm-dd-xx-<name>/requirements.md` and `specs/yyyy-mm-dd-xx-<name>/milestones.md`
+   - If the user provides arguments (e.g. `/audit .agent/specs/2026-04-26-01-generic-crud-api`), use the specified directory
+   - Otherwise, run `ls -d .agent/specs/*/` to list existing spec directories and ask the user which one to audit
+2. Read `.agent/specs/yyyy-mm-dd-xx-<name>/requirements.md` and `.agent/specs/yyyy-mm-dd-xx-<name>/milestones.md`
 
 ## Audit Process
 

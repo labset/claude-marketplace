@@ -11,8 +11,8 @@ You are reviewing completed or in-progress specs to identify deferred items, gap
 ## Setup
 
 1. Determine which specs to review:
-   - If the user provides arguments (e.g. `/review specs/2026-04-29-01-protoc-backend-codegen`), review that spec
-   - Otherwise, run `ls -d specs/*/` to list all spec directories and review all of them
+   - If the user provides arguments (e.g. `/review .agent/specs/2026-04-29-01-protoc-backend-codegen`), review that spec
+   - Otherwise, run `ls -d .agent/specs/*/` to list all spec directories and review all of them
 2. For each spec, read `requirements.md` and `milestones.md`
 
 ## Review Process
