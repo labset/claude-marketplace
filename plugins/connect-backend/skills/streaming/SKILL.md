@@ -10,74 +10,29 @@ You are generating Kafka streaming infrastructure from outbox events. Your goal 
 
 ## Prerequisites
 
-This skill requires artifacts from prior skills:
-- **Outbox event args** from `/outbox` — `outbox/event_*.go` files defining `Create<Model>EventArgs`, `Update<Model>EventArgs`, `Delete<Model>EventArgs`
-
-If these do not exist, inform the user to run `/outbox` first.
+This skill requires **outbox event args** from `/outbox` — `outbox/event_*.go` files. If these do not exist, inform the user to run `/outbox` first.
 
 ## Setup
 
 1. Determine the target:
    - If the user provides a path (e.g. `/streaming internal/acme/inventory/v1/`), use it
    - Otherwise, look for existing `outbox/event_*.go` files and ask the user which entities to generate streaming for
-2. Resolve the package path — locate the existing `internal/<provider>/<domain>/<version>/` root:
-   - The `outbox/` package already exists at `internal/<provider>/<domain>/<version>/outbox/` from the `/outbox` skill
-   - Workers go in `internal/<provider>/<domain>/<version>/workers/`
-   - Consumers go in `internal/<provider>/<domain>/<version>/consumers/`
-   - All Go imports for sibling subpackages use `<module>/internal/<provider>/<domain>/<version>/<subpackage>`
+2. Resolve the package path:
+   - Workers: `internal/<provider>/<domain>/<version>/workers/`
+   - Consumers: `internal/<provider>/<domain>/<version>/consumers/`
 3. Read the outbox event files to understand available event types
-4. Read the proto files or handler files to determine the domain and version for topic naming
-5. Determine subscriber types:
-   - Ask the user which consumer groups to generate: audit, index, webhook, notification
-   - Or accept custom subscriber names
-6. Verify `github.com/segmentio/kafka-go` is in `go.mod`
-   - If not, inform the user: `go get github.com/segmentio/kafka-go`
+4. Ask the user which consumer groups to generate (e.g. audit, index, webhook, notification, or custom names)
+5. Verify `github.com/segmentio/kafka-go` is in `go.mod` — if not, inform the user to add it
 
 ## Codebase Assessment
 
-Before generating anything, scan the existing codebase to understand what already exists and identify divergences from the target conventions. Present your findings to the user before proceeding.
+Before generating, scan for existing Kafka infrastructure, worker/job processing patterns, and consumer patterns. If existing patterns are found, present divergences and a proposed plan. Ask the user to confirm before proceeding. If no existing streaming code exists, skip and proceed directly.
 
-### What to look for
+## Event Envelope
 
-1. **Existing Kafka infrastructure**:
-   - Search for existing Kafka producer/consumer code (segmentio/kafka-go, confluent-kafka-go, sarama, etc.)
-   - Check for existing topic naming conventions
-   - Look for existing consumer group configurations and naming patterns
-
-2. **Existing worker/job processing**:
-   - Check whether River workers already exist and how they are registered
-   - Look for existing worker patterns: do they publish to Kafka, call downstream services, or do something else?
-   - Check for existing `EventEnvelope` or similar event wrapper types
-
-3. **Existing consumer patterns**:
-   - Check whether consumers use handler interfaces, callback functions, or a different pattern
-   - Look for existing consumer implementations to understand logging, error handling, and retry conventions
-   - Check for existing consumer group ID naming conventions
-
-### What to present to the user
-
-Summarise your findings as a short assessment:
-- **Matches**: existing patterns that align (e.g. already uses segmentio/kafka-go, topic naming matches convention)
-- **Divergences**: different Kafka client, different topic naming, different consumer patterns, existing workers that publish differently, etc.
-- **Proposed plan**: for each divergence, suggest one of:
-  - **Adopt as-is**: follow the project's existing Kafka conventions (e.g. "keep existing topic naming scheme `<service>.<entity>.v1` instead of `<domain>.<entity>.events.<version>`")
-  - **Incremental refactor**: suggest specific changes (e.g. "migrate from sarama to segmentio/kafka-go", "consolidate consumer group naming")
-  - **Generate alongside**: generate new workers and consumers alongside existing ones, letting the user migrate consumers incrementally
-
-Ask the user to confirm the plan before proceeding to generation. If no existing Kafka/streaming code exists, skip the assessment and proceed directly.
-
-## Phase 1: Event Envelope
-
-Generate `workers/envelope.go` (shared across all entities):
+Generate `workers/envelope.go` (shared across all entities, generate once, never overwrite):
 
 ```go
-package workers
-
-import (
-    "encoding/json"
-    "time"
-)
-
 type EventEnvelope struct {
     EntityID   string          `json:"entity_id"`
     Operation  string          `json:"operation"`
@@ -87,174 +42,42 @@ type EventEnvelope struct {
 }
 ```
 
-Only generate this file once. If it already exists, skip it.
+## Workers
 
-## Phase 2: Worker Registration
+For each entity, generate:
+- `workers/register_<entity_snake>.go` — a `Register<Model>Workers` function that registers all workers for that entity, plus a topic constant
+- `workers/worker_<operation>_<entity_snake>.go` — one per mutating operation
 
-Generate `workers/register_<entity_snake>.go` for each entity:
-
-```go
-package workers
-
-import (
-    "github.com/riverqueue/river"
-    "github.com/segmentio/kafka-go"
-)
-
-const <modelLower>Topic = "<domain>.<model_snake>.events.<version>"
-
-type <Model>WorkerDeps struct {
-    Writer *kafka.Writer
-}
-
-func Register<Model>Workers(workers *river.Workers, deps <Model>WorkerDeps) {
-    river.AddWorker(workers, &create<Model>Worker{writer: deps.Writer})
-    river.AddWorker(workers, &update<Model>Worker{writer: deps.Writer})
-    river.AddWorker(workers, &delete<Model>Worker{writer: deps.Writer})
-}
-```
+Each worker implements `river.Worker` for the corresponding outbox event args. It marshals the event into an `EventEnvelope` and publishes to Kafka using the entity ID as the message key (for partition ordering). Update workers include the `FieldMask` in the envelope.
 
 ### Topic naming convention
 
-- Format: `<domain>.<entity_snake>.events.<version>`
-- Derived from proto package: `acme.inventory.v1` with entity `Product` produces `inventory.product.events.v1`
-- The domain is the second segment of the proto package
+`<domain>.<entity_snake>.events.<version>` — derived from the proto package (e.g. `inventory.product.events.v1`).
 
-## Phase 3: Worker Implementations
+## Consumer Stubs
 
-Generate `workers/worker_<operation>_<entity_snake>.go` for each mutating operation:
+Generate `consumers/consumer_<subscriber>_<entity_snake>.go` per subscriber type.
 
-```go
-package workers
-
-import (
-    "context"
-    "encoding/json"
-    "fmt"
-
-    "github.com/riverqueue/river"
-    "github.com/segmentio/kafka-go"
-
-    "<module>/outbox"
-)
-
-type <operation><Model>Worker struct {
-    river.WorkerDefaults[outbox.<Operation><Model>EventArgs]
-    writer *kafka.Writer
-}
-
-func (w *<operation><Model>Worker) Work(ctx context.Context, job *river.Job[outbox.<Operation><Model>EventArgs]) error {
-    envelope := EventEnvelope{
-        EntityID:   job.Args.EntityID.String(),
-        Operation:  "<operation>",
-        OccurredAt: job.Args.OccurredAt,
-    }
-    data, err := json.Marshal(envelope)
-    if err != nil {
-        return fmt.Errorf("marshal envelope: %w", err)
-    }
-    return w.writer.WriteMessages(ctx, kafka.Message{
-        Topic: <modelLower>Topic,
-        Key:   []byte(envelope.EntityID),
-        Value: data,
-    })
-}
-```
-
-For the update worker, also include the FieldMask in the envelope:
-
-```go
-envelope := EventEnvelope{
-    EntityID:   job.Args.EntityID.String(),
-    Operation:  "update",
-    FieldMask:  job.Args.FieldMask,
-    OccurredAt: job.Args.OccurredAt,
-}
-```
-
-## Phase 4: Consumer Stubs
-
-Generate `consumers/consumer_<subscriber>_<entity_snake>.go` for each subscriber type:
-
-```go
-package consumers
-
-import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "log/slog"
-
-    "github.com/segmentio/kafka-go"
-
-    "<module>/workers"
-)
-
-type <Model><Subscriber>Handler interface {
-    Handle<Model>Event(ctx context.Context, envelope workers.EventEnvelope) error
-}
-
-func Run<Model><Subscriber>Consumer(ctx context.Context, brokers []string, handler <Model><Subscriber>Handler) error {
-    reader := kafka.NewReader(kafka.ReaderConfig{
-        Brokers: brokers,
-        Topic:   "<domain>.<model_snake>.events.<version>",
-        GroupID: "<domain>.<model_snake>.<subscriber_lower>",
-    })
-    defer reader.Close()
-
-    for {
-        msg, err := reader.ReadMessage(ctx)
-        if err != nil {
-            if ctx.Err() != nil {
-                return nil
-            }
-            return fmt.Errorf("read message: %w", err)
-        }
-
-        var envelope workers.EventEnvelope
-        if err := json.Unmarshal(msg.Value, &envelope); err != nil {
-            return fmt.Errorf("unmarshal envelope: %w", err)
-        }
-
-        if err := handler.Handle<Model>Event(ctx, envelope); err != nil {
-            return fmt.Errorf("handle event: %w", err)
-        }
-    }
-}
-```
+Each consumer stub defines:
+- A handler interface: `<Model><Subscriber>Handler` with `Handle<Model>Event(ctx, envelope) error`
+- A `Run<Model><Subscriber>Consumer` function that creates a `kafka.Reader` with the correct topic and group ID, reads messages in a loop, unmarshals envelopes, and delegates to the handler
 
 ### Consumer group ID convention
 
-- Format: `<domain>.<entity_snake>.<subscriber_lower>`
-- Example: `inventory.product.audit`
+`<domain>.<entity_snake>.<subscriber_lower>` (e.g. `inventory.product.audit`)
 
-## Phase 5: Verify
+## Verify
 
-- Confirm all generated files follow the layout:
-  ```
-  <output_dir>/
-  ├── workers/
-  │   ├── envelope.go
-  │   ├── register_<entity>.go
-  │   ├── worker_create_<entity>.go
-  │   ├── worker_update_<entity>.go
-  │   └── worker_delete_<entity>.go
-  └── consumers/
-      ├── consumer_audit_<entity>.go
-      ├── consumer_index_<entity>.go
-      └── ...
-  ```
-- Verify worker types reference the correct outbox event args
-- Verify topic names follow the `<domain>.<entity>.events.<version>` convention
-- Verify consumer group IDs follow the `<domain>.<entity>.<subscriber>` convention
-- Present a summary of workers and consumers generated to the user
+- Confirm layout: `workers/envelope.go`, `workers/register_*.go`, `workers/worker_*_*.go`, `consumers/consumer_*_*.go`
+- Verify worker types reference correct outbox event args
+- Verify topic names and consumer group IDs follow conventions
+- Present a summary to the user
 
 ## Rules
 
-- Always read outbox event files before generating workers to ensure type names match
+- Always read outbox event files before generating to ensure type names match
 - Only generate workers for operations that have corresponding outbox events
-- The envelope.go file is shared — generate it once, never overwrite
+- The envelope.go file is shared — generate once, never overwrite
 - Consumer stubs define an interface — the user implements the handler
 - If worker or consumer files already exist, ask the user before overwriting
-- Use `slog` for logging in consumers, not `log` or `fmt.Println`
 - Workers must use the entity ID as the Kafka message key for partition ordering

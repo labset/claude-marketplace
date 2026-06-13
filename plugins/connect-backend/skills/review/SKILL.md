@@ -127,8 +127,8 @@ Verify that proto validation annotations are properly applied:
 - Flag enum fields without this annotation
 
 ### Server-side enforcement
-- If `buf.validate` annotations are present, check that `api/interceptor_validate.go` exists
-- Verify the validation interceptor is applied to handler constructors (check for `protovalidate` import in the `api/` package)
+- If `buf.validate` annotations are present, verify that handler constructors use `connectrpc.com/validate` interceptor (e.g. `validate.NewInterceptor()` in handler options)
+- Flag any custom validation interceptor (`interceptor_validate.go` or `protovalidate` usage) — the official `connectrpc.com/validate` package should be used instead
 
 Report unbounded repeated fields as **warnings** (convention violation that could enable abuse).
 
