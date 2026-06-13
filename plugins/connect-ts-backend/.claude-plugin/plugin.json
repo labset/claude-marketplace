@@ -1,0 +1,5 @@
+{
+  "name": "connect-ts-backend",
+  "description": "Incrementally scaffold TypeScript Connect-RPC backends from proto definitions: schema, services, handlers, outbox, streaming, and MCP tools",
+  "version": "1.0.0"
+}
