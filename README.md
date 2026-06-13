@@ -15,7 +15,7 @@ Install a plugin:
 ```
 /plugin install spec-delivery@labset-marketplace
 /plugin install orchestrate@labset-marketplace
-/plugin install connect-backend@labset-marketplace
+/plugin install connect-go-backend@labset-marketplace
 ```
 
 ### Updating
@@ -31,7 +31,7 @@ Update an installed plugin to the latest version:
 ```
 /plugin update spec-delivery@labset-marketplace
 /plugin update orchestrate@labset-marketplace
-/plugin update connect-backend@labset-marketplace
+/plugin update connect-go-backend@labset-marketplace
 ```
 
 ### Auto-prompt for a repo
@@ -77,7 +77,7 @@ Agent orchestration layer for spec-delivery. Adds machine-readable status tracki
 
 Pipeline states: `ready` -> `shipping` -> `auditing` -> `done` | `audit_failed` | `blocked` | `error`
 
-### connect-backend
+### connect-go-backend
 
 Incrementally scaffold Connect-RPC backends from proto definitions. Each skill builds on the previous layer, producing a consistent codebase structure rooted at `internal/<provider>/<domain>/<version>/`.
 
