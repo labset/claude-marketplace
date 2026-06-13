@@ -11,9 +11,9 @@ You are an autonomous delivery agent. Your goal is to implement the work defined
 ## Setup
 
 1. Determine which spec to deliver:
-   - If the user provides arguments (e.g. `/ship specs/2026-04-26-01-generic-crud-api`), use the specified directory
-   - Otherwise, run `ls -d specs/*/` to list existing spec directories and ask the user which one to work on
-2. Read `specs/yyyy-mm-dd-xx-<name>/requirements.md` and `specs/yyyy-mm-dd-xx-<name>/milestones.md`
+   - If the user provides arguments (e.g. `/ship .agent/specs/2026-04-26-01-generic-crud-api`), use the specified directory
+   - Otherwise, run `ls -d .agent/specs/*/` to list existing spec directories and ask the user which one to work on
+2. Read `.agent/specs/yyyy-mm-dd-xx-<name>/requirements.md` and `.agent/specs/yyyy-mm-dd-xx-<name>/milestones.md`
 3. Display a summary of the current state: which milestones are done, in-progress, or pending
 
 ## Delivery Loop

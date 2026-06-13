@@ -11,11 +11,11 @@ You are facilitating an interactive requirements discussion session. Your goal i
 ## Setup
 
 1. Determine the spec directory for this session:
-   - Run `ls -d specs/*/` to list existing spec directories
-   - The naming convention is `specs/yyyy-mm-dd-xx-<name>/` where `yyyy-mm-dd` is today's date, `xx` is a two-digit sequence number starting at `01`, and `<name>` is a short kebab-case identifier for the spec
+   - Run `ls -d .agent/specs/*/` to list existing spec directories
+   - The naming convention is `.agent/specs/yyyy-mm-dd-xx-<name>/` where `yyyy-mm-dd` is today's date, `xx` is a two-digit sequence number starting at `01`, and `<name>` is a short kebab-case identifier for the spec
    - If directories already exist for today's date, increment the sequence number
    - The `<name>` is derived from the user's arguments (e.g. `/discuss generic crud api` becomes `generic-crud-api`)
-   - If the user provides an existing spec path (e.g. `/discuss specs/2026-04-26-01-generic-crud-api`), use the specified directory and resume from its current state
+   - If the user provides an existing spec path (e.g. `/discuss .agent/specs/2026-04-26-01-generic-crud-api`), use the specified directory and resume from its current state
 2. Create the spec directory if it does not exist
 3. Read existing `requirements.md` and `milestones.md` if resuming
 
@@ -32,14 +32,14 @@ Guide the user through a structured conversation. Do NOT write files until the u
 - Propose a structured set of requirements based on the discussion
 - Present them to the user for review
 - Iterate until the user is satisfied
-- Write the agreed requirements to `specs/yyyy-mm-dd-xx-<name>/requirements.md`
+- Write the agreed requirements to `.agent/specs/yyyy-mm-dd-xx-<name>/requirements.md`
 
 ### Phase 3: Milestone Planning
 - Propose delivery milestones that break the work into incremental, demonstrable steps
 - Each milestone should have: a name, a description, acceptance criteria, and a status (one of: pending, in-progress, done)
 - Present them to the user for review
 - Iterate until the user is satisfied
-- Write the agreed milestones to `specs/yyyy-mm-dd-xx-<name>/milestones.md`
+- Write the agreed milestones to `.agent/specs/yyyy-mm-dd-xx-<name>/milestones.md`
 
 ## File Formats
 
