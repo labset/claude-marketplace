@@ -14,42 +14,50 @@ You execute a spec milestone by milestone according to its `plan.yaml`. You do n
    - If the user supplied a path (e.g. `/ship .agent/specs/2026-06-22-01-foo`), use it
    - Otherwise list `ls -d .agent/specs/*/` and ask which spec to ship
 2. Read `<spec>/milestones.yaml`, `<spec>/requirements.md`, and `<spec>/plan.yaml`. If `plan.yaml` is missing, refuse and tell the user to run `/orchestrate`.
-3. **Freshness check**: compute `shasum -a 256 <spec>/milestones.yaml | awk '{print $1}'`. If it does not equal `source_hash` in `plan.yaml`, refuse and tell the user to re-run `/orchestrate`.
+3. **Freshness check**: compute the **structural hash** of `milestones.yaml` (see "Structural hash" at the end of this file) and compare it to `source_hash` in `plan.yaml`. If they differ, refuse and tell the user to re-run `/orchestrate`. Mutable fields (`status`, `acceptance[].verified`) are excluded from the hash so partial runs do not invalidate the plan.
 4. Ensure `.agent/worktrees/` is gitignored at the project root. If `.gitignore` exists and lacks the entry, append it. If `.gitignore` does not exist, create it with that single line.
 5. Note the parent branch (the user's current branch). All milestone commits land here.
 
 ## Execution
 
+Before dispatching anything for a milestone, check its current `status` in `milestones.yaml`. Skip milestones with `status: done` (already shipped, e.g. resuming after an interrupted run) and `status: blocked` (previously failed; the user must intervene before they can ship).
+
 Update `milestones.yaml` immediately after each step that changes state — never batch.
 
 ### Step 1: Contracts (sequential)
 For each entry in `plan.yaml > contracts`, in declared order:
-1. Dispatch a coding subagent (see "Subagent dispatch")
-2. Apply the **AC gate**
-3. Dispatch a per-milestone review subagent (contracts default to `review: strict`); apply the **review gate**
-4. Apply the **merge step**
+1. Create the worktree: `git worktree add .agent/worktrees/<spec>/<milestone-id> -b ship/<spec>/<milestone-id>`
+2. Dispatch a coding subagent (see "Subagent dispatch") using the milestone's `model`
+3. Apply the **AC gate**
+4. Dispatch a per-milestone review subagent (contracts default to `review: strict`) using `sonnet`; apply the **review gate** — fixes happen in the existing worktree
+5. From the parent branch: `git merge --squash ship/<spec>/<milestone-id>`
+6. Update `milestones.yaml`: this milestone's `status: done` and every AC's `verified: true`
+7. Stage everything including `milestones.yaml`, then `git commit -m "ship(<spec>): <milestone-name>"`
+8. `git worktree remove .agent/worktrees/<spec>/<milestone-id>` and `git branch -D ship/<spec>/<milestone-id>`
 
-If any contracts milestone blocks, stop the entire ship — every downstream wave depends on contracts.
+If any contracts milestone blocks, stop the entire ship — every downstream wave depends on contracts. Leave the failed worktree in place for user inspection.
 
-### Step 2: Waves (parallel coding → sequential merge → one wave review)
+### Step 2: Waves (parallel coding → AC gate → wave review → sequential merge → cleanup)
 For each wave in `plan.yaml > waves`, in order:
 
-**(a) Parallel coding.** For every milestone in the wave:
-- Create the worktree: `git worktree add .agent/worktrees/<spec>/<milestone-id> -b ship/<spec>/<milestone-id>`
+**(a) Parallel coding.** For every milestone in the wave, first create the worktree:
+
+- `git worktree add .agent/worktrees/<spec>/<milestone-id> -b ship/<spec>/<milestone-id>`
 
 Then dispatch all milestones' coding subagents **in a single message with multiple Agent tool uses** so they run concurrently. Each Agent call uses the milestone's `model:` from `plan.yaml`.
 
-**(b) AC gate per milestone.** After all parallel agents return, apply the AC gate to each (retries are serial — see "AC gate"). Milestones that pass move to merge; milestones that block are marked `status: blocked` along with their transitive dependents.
+**(b) AC gate per milestone.** After all parallel agents return, apply the AC gate to each (retries are serial — see "AC gate"). Milestones that pass continue to review; milestones that block are marked `status: blocked` along with their transitive dependents, and their worktrees are left in place for user inspection.
 
-**(c) Sequential merge.** For each passing milestone, in any topological order within the wave:
+**(c) Wave review (pre-merge).** If `plan.yaml` declares `review_level` / `review_model` for the wave, dispatch one review subagent over the passing milestones' unmerged branches (`ship/<spec>/<id>`) using `review_model`. Exclude any milestone whose `review:` is `skip` in `milestones.yaml`. Apply the **review gate** — because nothing is merged yet, any retries operate in the existing worktrees and re-running the review is cheap.
+
+**(d) Sequential merge.** For each milestone that passed both AC and review, in any topological order within the wave:
 1. From the parent branch: `git merge --squash ship/<spec>/<milestone-id>`
 2. Update `milestones.yaml`: set this milestone's `status: done` and every AC's `verified: true`
 3. Stage all changes including `milestones.yaml`, then `git commit -m "ship(<spec>): <milestone-name>"`
-4. `git worktree remove .agent/worktrees/<spec>/<milestone-id>` and `git branch -D ship/<spec>/<milestone-id>`
 
 If a merge collision occurs (orchestrate should have prevented this), stop and surface — do not auto-resolve.
 
-**(d) Wave review.** If `plan.yaml` declares `review_level` / `review_model` for the wave, dispatch one review subagent over the wave's commit range (`<first>^..<last>`) using `review_model`. Exclude milestones whose `review:` is `skip` in `milestones.yaml`. Apply the **review gate**.
+**(e) Cleanup.** For every successfully merged milestone: `git worktree remove .agent/worktrees/<spec>/<milestone-id>` and `git branch -D ship/<spec>/<milestone-id>`. Worktrees of blocked milestones stay in place.
 
 ### Step 3: Report
 When the plan is fully executed (or every remaining milestone is blocked), summarise:
@@ -120,13 +128,13 @@ Focus on satisfying these specifically. Same output format.
 You are reviewing changes for correctness bugs in spec <spec-name>.
 
 Working directory: <absolute-path-to-parent-branch-checkout>
-Scope: commit range <ref>..<ref>
+Parent branch: <parent-branch-name>
+
+Scope: the following unmerged branches against the parent. For each, inspect the diff via `git diff <parent-branch>...<branch>` and read the changed files in the corresponding worktree.
 
 Milestones in scope:
-- <id>: <name>
-- <id>: <name>
-
-Read the diff (`git log <range> -p`) and the changed files in their final form.
+- <id>: <name>   branch: ship/<spec>/<id>   worktree: <absolute-path>
+- <id>: <name>   branch: ship/<spec>/<id>   worktree: <absolute-path>
 
 Effort: <low | medium | high>  # low for review: minimal/standard, high for strict
 
@@ -178,3 +186,23 @@ After a review subagent returns:
 - Never auto-resolve a merge conflict. Surface and stop.
 - Do not modify `requirements.md` or `plan.yaml` during ship
 - If you genuinely cannot proceed (e.g. plan references a milestone missing from `milestones.yaml`), stop and tell the user
+
+## Structural hash
+
+The `source_hash` in `plan.yaml` excludes mutable fields that `/ship` updates during execution (`milestones[].status` and `milestones[].acceptance[].verified`), so the hash stays stable across partial runs and only invalidates when the user changes the spec shape.
+
+Both `/orchestrate` and `/ship` MUST use this exact algorithm:
+
+```bash
+python3 - "<spec>/milestones.yaml" <<'PY'
+import sys, yaml, hashlib
+d = yaml.safe_load(open(sys.argv[1]))
+for m in d.get("milestones", []):
+    m.pop("status", None)
+    for a in m.get("acceptance", []):
+        a.pop("verified", None)
+sys.stdout.write(hashlib.sha256(yaml.safe_dump(d, sort_keys=True).encode()).hexdigest())
+PY
+```
+
+Requires `PyYAML`; if missing, install via `pip install pyyaml` or fall back to an equivalent script in another language using the same field-stripping + sorted-keys YAML serialisation.

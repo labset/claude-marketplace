@@ -82,11 +82,31 @@ Ask the user to confirm before writing.
 
 ### Phase 6: Write plan.yaml
 On confirmation:
-1. Compute `source_hash`: `shasum -a 256 "<spec>/milestones.yaml" | awk '{print $1}'`
+1. Compute the **structural hash** of `milestones.yaml` (see "Structural hash" below)
 2. Write `<spec>/plan.yaml` per the schema below
 3. Tell the user that `/ship <spec>` is now ready to run
 
 Always overwrite any existing `plan.yaml` with the freshly computed one; note in the response if waves or estimates changed from a prior plan.
+
+## Structural hash
+
+The `source_hash` excludes mutable fields that `/ship` updates during execution (`milestones[].status` and `milestones[].acceptance[].verified`), so the hash stays stable across partial runs and only invalidates when the user changes the spec shape.
+
+Both `/orchestrate` and `/ship` MUST use this exact algorithm:
+
+```bash
+python3 - "<spec>/milestones.yaml" <<'PY'
+import sys, yaml, hashlib
+d = yaml.safe_load(open(sys.argv[1]))
+for m in d.get("milestones", []):
+    m.pop("status", None)
+    for a in m.get("acceptance", []):
+        a.pop("verified", None)
+sys.stdout.write(hashlib.sha256(yaml.safe_dump(d, sort_keys=True).encode()).hexdigest())
+PY
+```
+
+Requires `PyYAML`; if missing, install via `pip install pyyaml` or fall back to an equivalent script in another language using the same field-stripping + sorted-keys YAML serialisation.
 
 ## plan.yaml schema
 

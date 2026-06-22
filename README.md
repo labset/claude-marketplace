@@ -53,14 +53,17 @@ Add to any repo's `.claude/settings.json`:
 
 ### spec-delivery
 
-A spec-driven delivery workflow with four skills:
+A spec-driven delivery workflow with five skills, optimised for fast, low-cost autonomous delivery:
 
 | Skill | Description |
 |-------|-------------|
-| `/discuss` | Requirements discussion and milestone planning |
-| `/ship` | Build and deliver milestones with production readiness checks |
-| `/audit` | Audit spec vs implementation for gaps and divergences |
-| `/review` | Review deferred items and recommend future work |
+| `/discuss` | Interactive requirements and milestone planning; emits `requirements.md` (human-facing) and `milestones.yaml` (structured: dependencies, model hints, review level, touches, M0 contracts convention) |
+| `/orchestrate` | Read `milestones.yaml`, build the dependency DAG, compute parallel execution waves, route models, estimate token cost, write `plan.yaml` with a hash gate. Spawns no agents. |
+| `/ship` | Autonomously execute `plan.yaml` via parallel coding subagents in per-milestone worktrees with sliced context; enforces a hard acceptance-criteria gate, runs a per-wave review, and squash-merges in dependency order. Refuses without a fresh plan. |
+| `/audit` | Audit spec vs implementation; supports `--milestone <id>` scoping; tags every finding `[FIX-VIA-DISCUSS]` / `[FIX-VIA-SHIP <id>]` / `[FIX-VIA-EDIT <path>]` to separate spec gaps from delivery gaps |
+| `/review` | Review deferred items across specs and recommend future work |
+
+Typical flow: `/discuss` → `/orchestrate` → `/ship` → `/audit` (when verifying or after a block) → `/review` (to plan future specs).
 
 ### connect-go-backend
 
