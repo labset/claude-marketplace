@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 You are adding the transactional outbox pattern to existing Connect-RPC handlers. Your goal is to wrap mutating operations (create, update, delete) in database transactions with River job queue event insertion.
 
+See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection).
+
 ## Prerequisites
 
 This skill requires artifacts from prior skills:
@@ -24,10 +26,6 @@ If these do not exist, inform the user which skills to run first.
 2. Resolve the package path — outbox event args go in `internal/<provider>/<domain>/<version>/outbox/`
 3. Read the existing handler files in `api/`
 4. Verify `github.com/riverqueue/river` is in `go.mod` — if not, inform the user to add it
-
-## Codebase Assessment
-
-Before generating, scan for existing event/messaging patterns, transaction handling, and job queue usage. If existing patterns are found, present divergences and a proposed plan. Ask the user to confirm before proceeding. If no existing event code exists, skip and proceed directly.
 
 ## Event Args
 
@@ -58,18 +56,8 @@ Update create, update, and delete RPC implementations to use the transactional o
 
 Do NOT modify Get and List RPCs — they do not participate in the outbox pattern.
 
-## Verify
-
-- Confirm event files exist in `outbox/` for each mutating operation
-- Verify handler struct has `pool` and `river` fields
-- Verify mutating RPCs use transactions with `InsertTx`
-- Verify non-mutating RPCs are unchanged
-- Present a summary to the user
-
 ## Rules
 
-- Always read existing handler and RPC files before modifying
 - Preserve all existing error handling logic
 - The transaction wraps BOTH the database operation AND the River event insertion — this is the outbox guarantee
 - Get and List operations are never modified
-- If outbox event files already exist, ask the user before overwriting

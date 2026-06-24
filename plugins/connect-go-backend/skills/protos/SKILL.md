@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 You are generating Connect-RPC service `.proto` files from entity message definitions. Your goal is to read proto messages and produce service definitions with RPCs, request/response types, and proper imports.
 
+See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection).
+
 ## Setup
 
 1. Determine the proto source:
@@ -16,10 +18,6 @@ You are generating Connect-RPC service `.proto` files from entity message defini
 2. Read the proto files and identify entity messages (same criteria as `/db-schema`)
 3. Ask the user which CRUD operations each entity needs (default: all five)
 4. Resolve the package path and reuse the `go_package` option from existing proto files
-
-## Codebase Assessment
-
-Before generating, scan for existing service definitions, proto file organisation, and RPC patterns. If existing patterns are found, present divergences and a proposed plan. Ask the user to confirm before proceeding. If no existing service protos exist, skip and proceed directly.
 
 ## Service Definition
 
@@ -49,19 +47,9 @@ After generating RPC protos, review entity model messages for fields that need v
 
 Present proposed annotations to the user for confirmation before modifying model protos.
 
-## Verify
-
-- Confirm files follow naming: `service_<entity>.proto`, `rpc_<operation>_<entity>.proto`
-- Verify import paths, `go_package`, and `package` match existing proto files
-- Verify all `id` fields have UUID validation, `page_size` has bounded range, `repeated` request fields have `max_items`
-- Present a summary to the user
-
 ## Rules
 
-- Always read existing proto files to extract correct `package` and `go_package`
 - Do not modify existing proto files without presenting proposed changes to the user first
-- If a service proto already exists, ask the user whether to regenerate or skip
-- Always use `buf/validate/validate.proto` for input validation
+- Always use `buf/validate/validate.proto` for input validation — if not in `buf.yaml` deps, inform the user
 - Never leave `repeated` fields on request messages unbounded
 - Each RPC message type goes in its own file to keep protos modular
-- If the project does not yet depend on `buf/validate`, inform the user to add it to their `buf.yaml` deps

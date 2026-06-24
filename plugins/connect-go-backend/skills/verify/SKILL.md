@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 You are reviewing a connect-backend codebase to verify that all generated and hand-written code follows the expected structural patterns, naming conventions, and cross-layer alignment. Your goal is to identify gaps, inconsistencies, and convention violations — then suggest targeted fixes.
 
+See `CONVENTIONS.md` for shared conventions.
+
 ## Setup
 
 1. Determine the review scope:
@@ -169,9 +171,7 @@ If the review surfaces patterns that should be addressed across the board (e.g. 
 
 ## Rules
 
-- Read all relevant files before reporting — do not flag issues based on assumptions
-- Distinguish between errors (code will not compile or behave incorrectly) and warnings (convention violations that work but diverge from the standard)
-- Do not modify any files — this skill is read-only and reports only
-- If the user has adopted only a subset of layers (e.g. schema + handlers, no outbox), only review the layers that are present
-- Be specific with file paths and line numbers so the user can navigate directly to issues
-- If the codebase followed an "adopt as-is" decision from a previous assessment (e.g. different package location), note it as context rather than flagging it as a violation
+- This skill is read-only — do not modify any files
+- Distinguish between errors (will not compile) and warnings (convention violations)
+- Only review layers that are present — do not flag missing optional layers
+- Be specific with file paths and line numbers

@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 You are generating MCP (Model Context Protocol) tool wrappers for Connect-RPC services. Your goal is to read existing service handlers and produce MCP tool implementations that expose CRUD operations for Claude integration.
 
+See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection).
+
 ## Prerequisites
 
 This skill requires:
@@ -28,10 +30,6 @@ If these do not exist, inform the user which skills to run first.
    - `github.com/mark3labs/mcp-go` (community, adapt if already in use)
    - If neither is present, inform the user to add the official SDK
 
-## Codebase Assessment
-
-Before generating, scan for existing MCP implementation, tool patterns, and how tools delegate to backend services. If existing patterns are found, present divergences and a proposed plan. Ask the user to confirm before proceeding. If no existing MCP code exists, skip and proceed directly.
-
 ## Tool Registry
 
 Generate `mcp/registry_<entity_snake>.go` per entity with:
@@ -50,18 +48,9 @@ Generate `mcp/tool_<operation>_<entity_snake>.go` per operation. All tools follo
 
 Only generate tools for operations that exist in the service definition.
 
-## Verify
-
-- Confirm layout: `mcp/registry_*.go`, `mcp/tool_*_*.go`
-- Verify tools struct references the Connect service handler interface
-- Verify imports resolve correctly
-- Present a summary to the user
-
 ## Rules
 
-- Always read service proto and handler files before generating
 - MCP tools delegate to the Connect handler interface — they do NOT directly access the database
 - Tool errors are returned as `CallToolResult` with `IsError: true`, not as Go errors
-- If MCP tool files already exist, ask the user before overwriting
 - The registry function takes the Connect service handler interface, not the concrete struct
 - If the project uses `mark3labs/mcp-go`, adapt the generated code to match that SDK's API

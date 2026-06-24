@@ -1,5 +1,5 @@
 {
   "name": "connect-go-backend",
-  "description": "Incrementally scaffold Connect-RPC backends from proto definitions: config, db-schema, protos, api-handlers, api-server, outbox, streaming, mcp-tools, and mcp-server",
+  "description": "Incrementally scaffold Connect-RPC backends from proto definitions: config, db-schema, protos, api-handlers, server, outbox, streaming, mcp-tools, and verify",
   "version": "0.1.0"
 }

@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 You are generating the database layer for a Connect-RPC backend. Your goal is to read proto message definitions and produce PostgreSQL schema, sqlc query definitions, sqlc configuration, and Atlas migration configuration.
 
+See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection).
+
 ## Setup
 
 1. Determine the proto source:
@@ -18,10 +20,6 @@ You are generating the database layer for a Connect-RPC backend. Your goal is to
    - `acme.inventory.v1` becomes `internal/acme/inventory/v1/`
    - All subpackages (`sql/`, `db/`, `api/`, `outbox/`, `workers/`, `consumers/`, `mcp/`) nest under this path
 4. Read `go.mod` for the module path
-
-## Codebase Assessment
-
-Before generating, scan for existing SQL files, migration directories, sqlc/Atlas config, and database connection code. If existing patterns are found, present divergences and a proposed plan (adopt, refactor incrementally, or generate alongside). Ask the user to confirm before proceeding. If greenfield, skip and proceed directly.
 
 ## Schema Generation
 
@@ -132,17 +130,7 @@ package <version>
 
 The `package` declaration must match the directory name (e.g. `package v1`). This allows running `go generate ./internal/<provider>/<domain>/<version>/` to execute both sqlc code generation and Atlas migration diffing in one command.
 
-## Verify
-
-- Confirm layout: `sql/schema.sql`, `sql/baseline.sql`, `sql/queries/<entity>.sql`, `sqlc.yaml`, `atlas.hcl`, `generate.go`
-- Verify column types match proto field types
-- Verify entity columns are present in every table
-- Present a summary to the user
-
 ## Rules
 
-- Always read the proto files before generating
 - Preserve existing sql files that are not entity-related
-- If schema.sql already exists, ask the user whether to regenerate or merge
-- Use snake_case for tables and columns, PascalCase for sqlc query names
 - Do not generate Go code (handled by sqlc tooling and subsequent skills)

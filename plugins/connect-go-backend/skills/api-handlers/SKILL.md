@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 You are generating Connect-RPC handler implementations for proto services. Your goal is to read service definitions and sqlc-generated stores, then produce handler structs, proto-to-DB mappers, and RPC implementations.
 
+See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection).
+
 ## Prerequisites
 
 This skill requires artifacts from prior skills:
@@ -26,10 +28,6 @@ If these do not exist, inform the user which skills to run first.
    - Output directory for handlers: `internal/<provider>/<domain>/<version>/api/`
    - DB package: `internal/<provider>/<domain>/<version>/db/`
 4. Derive Go import paths from the proto `go_package` option
-
-## Codebase Assessment
-
-Before generating, scan for existing handler patterns, data access layer, and package layout. If existing code is found, present divergences from the target conventions and a proposed plan (adopt existing patterns, suggest incremental refactors, or generate alongside). Ask the user to confirm before proceeding. If no existing handler code exists, skip and proceed directly.
 
 ## Generation
 
@@ -76,16 +74,8 @@ path, handler := New<Model>ServiceHandler(deps, opts...)
 
 If `buf.validate` annotations are not present in the protos, skip — handler-level validation (UUID parsing, etc.) is sufficient.
 
-## Verify
-
-- Confirm generated files follow the layout: `handler_*.go`, `mapper_*.go`, `rpc_*_*.go` under `api/`
-- Verify imports resolve against `go.mod` and the sqlc `db/` package
-- Verify mapper functions reference the correct sqlc types
-- Present a summary to the user
-
 ## Rules
 
-- Always read the sqlc `db/` package and service protos before generating to ensure type names match
 - Only generate RPC files for operations that have corresponding service RPCs
-- If an `api/rpc_*.go` file already exists, do NOT overwrite it (it may contain user customizations)
-- Handler and mapper files may be regenerated (they are structural, not customized)
+- RPC files (`api/rpc_*.go`) are customisable — do NOT overwrite existing ones
+- Handler and mapper files are structural — may be regenerated
