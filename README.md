@@ -68,13 +68,13 @@ Incrementally scaffold Connect-RPC backends from proto definitions. Each skill b
 
 | Skill | Description |
 |-------|-------------|
-| `/schema` | Generate PostgreSQL schema, sqlc queries, and Atlas migration config from proto messages |
-| `/service` | Generate Connect-RPC service `.proto` files with RPCs and request/response types |
-| `/handlers` | Generate Connect-RPC handler implementations backed by sqlc stores |
+| `/db-schema` | Generate PostgreSQL schema, sqlc queries, and Atlas migration config from proto messages |
+| `/protos` | Generate Connect-RPC proto definitions (entity models, service RPCs, request/response types) |
+| `/api-handlers` | Generate Connect-RPC handler implementations backed by sqlc stores |
 | `/outbox` | Add transactional outbox pattern with River job queue for reliable event delivery |
 | `/streaming` | Generate Kafka workers (River to Kafka) and typed consumer group stubs |
-| `/mcp` | Generate MCP tool wrappers exposing service operations for Claude integration |
-| `/review` | Review structural consistency, naming conventions, and cross-layer alignment |
+| `/mcp-tools` | Generate MCP tool wrappers exposing service operations for Claude integration |
+| `/verify` | Verify structural consistency, naming conventions, and cross-layer alignment |
 
-Skills are designed to work incrementally: `/schema` -> `/service` -> `/handlers` -> `/outbox` -> `/streaming` -> `/mcp`. Run `/review` at any point to verify everything holds together. Each skill assesses the existing codebase before generating, so it can adapt to established patterns or suggest incremental refactors toward the target conventions.
+Skills are designed to work incrementally: `/db-schema` -> `/protos` -> `/api-handlers` -> `/outbox` -> `/streaming` -> `/mcp-tools`. Run `/verify` at any point to verify everything holds together. Each skill assesses the existing codebase before generating, so it can adapt to established patterns or suggest incremental refactors toward the target conventions.
 

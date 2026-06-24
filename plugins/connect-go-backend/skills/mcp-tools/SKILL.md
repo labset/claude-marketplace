@@ -4,22 +4,22 @@ argument-hint: <entity or output directory>
 disable-model-invocation: true
 ---
 
-# /mcp - MCP Tool Generation
+# /mcp-tools - MCP Tool Generation
 
 You are generating MCP (Model Context Protocol) tool wrappers for Connect-RPC services. Your goal is to read existing service handlers and produce MCP tool implementations that expose CRUD operations for Claude integration.
 
 ## Prerequisites
 
 This skill requires:
-- **Handler implementations** from `/handlers` — `api/handler_*.go`
-- **Service proto files** from `/service` — for RPC signatures and request/response types
+- **Handler implementations** from `/api-handlers` — `api/handler_*.go`
+- **Service proto files** from `/protos` — for RPC signatures and request/response types
 
 If these do not exist, inform the user which skills to run first.
 
 ## Setup
 
 1. Determine the target:
-   - If the user provides a path (e.g. `/mcp internal/acme/inventory/v1/`), use it
+   - If the user provides a path (e.g. `/mcp-tools internal/acme/inventory/v1/`), use it
    - Otherwise, look for existing `api/handler_*.go` files and ask the user which entities to generate MCP tools for
 2. MCP tools go in `internal/<provider>/<domain>/<version>/mcp/`
 3. Read the service proto files and handler files to understand available operations

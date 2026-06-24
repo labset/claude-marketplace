@@ -4,22 +4,22 @@ argument-hint: <proto file or directory>
 disable-model-invocation: true
 ---
 
-# /handlers - Connect-RPC Handler Implementation
+# /api-handlers - Connect-RPC Handler Implementation
 
 You are generating Connect-RPC handler implementations for proto services. Your goal is to read service definitions and sqlc-generated stores, then produce handler structs, proto-to-DB mappers, and RPC implementations.
 
 ## Prerequisites
 
 This skill requires artifacts from prior skills:
-- **Service proto files** from `/service` — `service_*.proto` and `rpc_*.proto` files defining RPCs and request/response types
-- **sqlc-generated code** from `/schema` + `sqlc generate` — the `db/` package with `Queries`, model types, and query methods
+- **Service proto files** from `/protos` — `service_*.proto` and `rpc_*.proto` files defining RPCs and request/response types
+- **sqlc-generated code** from `/db-schema` + `sqlc generate` — the `db/` package with `Queries`, model types, and query methods
 
 If these do not exist, inform the user which skills to run first.
 
 ## Setup
 
 1. Determine the source:
-   - If the user provides a path (e.g. `/handlers protos/acme/inventory/v1/`), use it
+   - If the user provides a path (e.g. `/api-handlers protos/acme/inventory/v1/`), use it
    - Otherwise, search for `service_*.proto` files and ask the user which services to implement
 2. Read the service proto files, sqlc-generated `db/` package (`models.go` and query files), and `go.mod`
 3. Resolve paths from the proto `package` declaration:

@@ -4,14 +4,14 @@ argument-hint: <proto file or directory>
 disable-model-invocation: true
 ---
 
-# /schema - Database Schema and Query Generation
+# /db-schema - Database Schema and Query Generation
 
 You are generating the database layer for a Connect-RPC backend. Your goal is to read proto message definitions and produce PostgreSQL schema, sqlc query definitions, sqlc configuration, and Atlas migration configuration.
 
 ## Setup
 
 1. Determine the proto source:
-   - If the user provides a path (e.g. `/schema protos/acme/inventory/v1/`), use it
+   - If the user provides a path (e.g. `/db-schema protos/acme/inventory/v1/`), use it
    - Otherwise, search for `.proto` files and ask the user which messages to target
 2. Read the proto files and identify entity messages (messages with `id`, `created_at`, `updated_at` fields, or `ROLE_ENTITY` options, or `labset.data.v1.Entity` embedding)
 3. Resolve the package path from the proto `package` declaration:
@@ -88,6 +88,11 @@ sql:
             go_type:
               import: "github.com/gofrs/uuid/v5"
               type: "UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/gofrs/uuid/v5"
+              type: "NullUUID"
 ```
 
 ## Atlas Migration Configuration
@@ -114,9 +119,22 @@ Generate `sql/baseline.sql`:
 CREATE SCHEMA IF NOT EXISTS public;
 ```
 
+## Go Generate File
+
+Generate `generate.go` as a sibling to `atlas.hcl` and `sqlc.yaml`:
+
+```go
+package <version>
+
+//go:generate sqlc generate
+//go:generate atlas migrate diff --env local
+```
+
+The `package` declaration must match the directory name (e.g. `package v1`). This allows running `go generate ./internal/<provider>/<domain>/<version>/` to execute both sqlc code generation and Atlas migration diffing in one command.
+
 ## Verify
 
-- Confirm layout: `sql/schema.sql`, `sql/baseline.sql`, `sql/queries/<entity>.sql`, `sqlc.yaml`, `atlas.hcl`
+- Confirm layout: `sql/schema.sql`, `sql/baseline.sql`, `sql/queries/<entity>.sql`, `sqlc.yaml`, `atlas.hcl`, `generate.go`
 - Verify column types match proto field types
 - Verify entity columns are present in every table
 - Present a summary to the user

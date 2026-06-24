@@ -11,8 +11,8 @@ You are adding the transactional outbox pattern to existing Connect-RPC handlers
 ## Prerequisites
 
 This skill requires artifacts from prior skills:
-- **Handler implementations** from `/handlers` — `api/handler_*.go` and `api/rpc_*.go`
-- **sqlc store** from `/schema` + `sqlc generate` — the `db/` package with `Queries.WithTx()`
+- **Handler implementations** from `/api-handlers` — `api/handler_*.go` and `api/rpc_*.go`
+- **sqlc store** from `/db-schema` + `sqlc generate` — the `db/` package with `Queries.WithTx()`
 
 If these do not exist, inform the user which skills to run first.
 

@@ -1,17 +1,17 @@
 ---
-description: Review the connect-backend codebase for structural consistency, naming conventions, and cross-layer alignment. Use after running generation skills to verify everything holds together.
+description: Verify the connect-backend codebase for structural consistency, naming conventions, and cross-layer alignment. Use after running generation skills to verify everything holds together.
 argument-hint: <output directory>
 disable-model-invocation: true
 ---
 
-# /review - Structural Review and Convention Compliance
+# /verify - Structural Verification and Convention Compliance
 
 You are reviewing a connect-backend codebase to verify that all generated and hand-written code follows the expected structural patterns, naming conventions, and cross-layer alignment. Your goal is to identify gaps, inconsistencies, and convention violations — then suggest targeted fixes.
 
 ## Setup
 
 1. Determine the review scope:
-   - If the user provides a path (e.g. `/review internal/acme/inventory/v1/`), review that package root
+   - If the user provides a path (e.g. `/verify internal/acme/inventory/v1/`), review that package root
    - Otherwise, search for `internal/*/*/v*/` directories and ask the user which to review
 2. Read the proto files to build a reference list of entities, their fields, and configured operations
 3. Scan all subpackages (`sql/`, `db/`, `api/`, `outbox/`, `workers/`, `consumers/`, `mcp/`) to understand which layers have been generated

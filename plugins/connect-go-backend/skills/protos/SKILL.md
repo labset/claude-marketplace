@@ -1,19 +1,19 @@
 ---
-description: Generate Connect-RPC service proto definitions from entity messages. Use when the user wants to create service RPCs, request/response types for their proto entities.
+description: Generate Connect-RPC proto definitions (entity models, service RPCs, request/response types) from entity messages. Use when the user wants to create or update proto files for their entities.
 argument-hint: <proto file or directory>
 disable-model-invocation: true
 ---
 
-# /service - Connect-RPC Service Proto Generation
+# /protos - Connect-RPC Proto Generation
 
 You are generating Connect-RPC service `.proto` files from entity message definitions. Your goal is to read proto messages and produce service definitions with RPCs, request/response types, and proper imports.
 
 ## Setup
 
 1. Determine the proto source:
-   - If the user provides a path (e.g. `/service protos/acme/inventory/v1/`), use it
+   - If the user provides a path (e.g. `/protos protos/acme/inventory/v1/`), use it
    - Otherwise, search for `.proto` files and ask the user which entities to generate services for
-2. Read the proto files and identify entity messages (same criteria as `/schema`)
+2. Read the proto files and identify entity messages (same criteria as `/db-schema`)
 3. Ask the user which CRUD operations each entity needs (default: all five)
 4. Resolve the package path and reuse the `go_package` option from existing proto files
 
