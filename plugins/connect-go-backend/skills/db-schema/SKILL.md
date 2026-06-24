@@ -4,24 +4,22 @@ argument-hint: <proto file or directory>
 disable-model-invocation: true
 ---
 
-# /schema - Database Schema and Query Generation
+# /db-schema - Database Schema and Query Generation
 
 You are generating the database layer for a Connect-RPC backend. Your goal is to read proto message definitions and produce PostgreSQL schema, sqlc query definitions, sqlc configuration, and Atlas migration configuration.
+
+Before generating, scan for existing code that overlaps with what this skill produces. If existing patterns are found, present divergences and ask the user to confirm a plan before proceeding. If no existing code is found, proceed directly. After generating, verify expected files exist with correct package declarations and imports, then present a summary. If target files already exist, ask the user before overwriting.
 
 ## Setup
 
 1. Determine the proto source:
-   - If the user provides a path (e.g. `/schema protos/acme/inventory/v1/`), use it
+   - If the user provides a path (e.g. `/db-schema protos/acme/inventory/v1/`), use it
    - Otherwise, search for `.proto` files and ask the user which messages to target
 2. Read the proto files and identify entity messages (messages with `id`, `created_at`, `updated_at` fields, or `ROLE_ENTITY` options, or `labset.data.v1.Entity` embedding)
 3. Resolve the package path from the proto `package` declaration:
    - `acme.inventory.v1` becomes `internal/acme/inventory/v1/`
    - All subpackages (`sql/`, `db/`, `api/`, `outbox/`, `workers/`, `consumers/`, `mcp/`) nest under this path
 4. Read `go.mod` for the module path
-
-## Codebase Assessment
-
-Before generating, scan for existing SQL files, migration directories, sqlc/Atlas config, and database connection code. If existing patterns are found, present divergences and a proposed plan (adopt, refactor incrementally, or generate alongside). Ask the user to confirm before proceeding. If greenfield, skip and proceed directly.
 
 ## Schema Generation
 
@@ -88,6 +86,11 @@ sql:
             go_type:
               import: "github.com/gofrs/uuid/v5"
               type: "UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/gofrs/uuid/v5"
+              type: "NullUUID"
 ```
 
 ## Atlas Migration Configuration
@@ -102,10 +105,13 @@ env "local" {
   ]
   dev = "docker://postgres/17-alpine/dev"
   migration {
-    dir = "file://migrations"
+    dir    = "file://migrations"
+    format = goose
   }
 }
 ```
+
+The default migration format is `goose`. If the user specifies a different format (e.g. `golang-migrate`, `flyway`), use that instead.
 
 Generate `sql/baseline.sql`:
 
@@ -114,17 +120,35 @@ Generate `sql/baseline.sql`:
 CREATE SCHEMA IF NOT EXISTS public;
 ```
 
-## Verify
+## Embedded Migrations
 
-- Confirm layout: `sql/schema.sql`, `sql/baseline.sql`, `sql/queries/<entity>.sql`, `sqlc.yaml`, `atlas.hcl`
-- Verify column types match proto field types
-- Verify entity columns are present in every table
-- Present a summary to the user
+Generate `migrations.go` as a sibling to `atlas.hcl`:
+
+```go
+package <version>
+
+import "embed"
+
+//go:embed migrations/*.sql
+var Migrations embed.FS
+```
+
+This embeds the migration files for use at runtime (e.g. with goose). The `package` declaration must match the directory name (e.g. `package v1`).
+
+## Go Generate File
+
+Generate `generate.go` as a sibling to `atlas.hcl` and `sqlc.yaml`:
+
+```go
+package <version>
+
+//go:generate sqlc generate
+//go:generate atlas migrate diff --env local
+```
+
+This allows running `go generate ./internal/<provider>/<domain>/<version>/` to execute both sqlc code generation and Atlas migration diffing in one command.
 
 ## Rules
 
-- Always read the proto files before generating
 - Preserve existing sql files that are not entity-related
-- If schema.sql already exists, ask the user whether to regenerate or merge
-- Use snake_case for tables and columns, PascalCase for sqlc query names
 - Do not generate Go code (handled by sqlc tooling and subsequent skills)

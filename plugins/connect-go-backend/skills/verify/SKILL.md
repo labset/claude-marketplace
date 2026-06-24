@@ -1,17 +1,17 @@
 ---
-description: Review the connect-backend codebase for structural consistency, naming conventions, and cross-layer alignment. Use after running generation skills to verify everything holds together.
+description: Verify the connect-backend codebase for structural consistency, naming conventions, and cross-layer alignment. Use after running generation skills to verify everything holds together.
 argument-hint: <output directory>
 disable-model-invocation: true
 ---
 
-# /review - Structural Review and Convention Compliance
+# /verify - Structural Verification and Convention Compliance
 
 You are reviewing a connect-backend codebase to verify that all generated and hand-written code follows the expected structural patterns, naming conventions, and cross-layer alignment. Your goal is to identify gaps, inconsistencies, and convention violations — then suggest targeted fixes.
 
 ## Setup
 
 1. Determine the review scope:
-   - If the user provides a path (e.g. `/review internal/acme/inventory/v1/`), review that package root
+   - If the user provides a path (e.g. `/verify internal/acme/inventory/v1/`), review that package root
    - Otherwise, search for `internal/*/*/v*/` directories and ask the user which to review
 2. Read the proto files to build a reference list of entities, their fields, and configured operations
 3. Scan all subpackages (`sql/`, `db/`, `api/`, `outbox/`, `workers/`, `consumers/`, `mcp/`) to understand which layers have been generated
@@ -169,9 +169,7 @@ If the review surfaces patterns that should be addressed across the board (e.g. 
 
 ## Rules
 
-- Read all relevant files before reporting — do not flag issues based on assumptions
-- Distinguish between errors (code will not compile or behave incorrectly) and warnings (convention violations that work but diverge from the standard)
-- Do not modify any files — this skill is read-only and reports only
-- If the user has adopted only a subset of layers (e.g. schema + handlers, no outbox), only review the layers that are present
-- Be specific with file paths and line numbers so the user can navigate directly to issues
-- If the codebase followed an "adopt as-is" decision from a previous assessment (e.g. different package location), note it as context rather than flagging it as a violation
+- This skill is read-only — do not modify any files
+- Distinguish between errors (will not compile) and warnings (convention violations)
+- Only review layers that are present — do not flag missing optional layers
+- Be specific with file paths and line numbers
