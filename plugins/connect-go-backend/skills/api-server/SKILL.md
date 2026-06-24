@@ -19,9 +19,10 @@ If the config package does not exist, inform the user to run `/config` first. If
 
 ## Setup
 
-1. Determine the service name:
-   - If the user provides a name (e.g. `/api-server inventory`), use it as the binary name under `cmd/`
-   - Otherwise, infer from the module path or ask the user
+1. Determine the target name:
+   - Default: `cmd/api-server/main.go`
+   - If the user provides a name (e.g. `/api-server inventory`), use `cmd/api-<name>/main.go`
+   - The `api-` prefix is always applied — it identifies Connect-RPC API entrypoints
 2. Read `go.mod` for the module path
 3. Scan for existing `api/handler_*.go` files to discover available handler constructors and their `Deps` types
 4. Check for existing `cmd/` directories to avoid overwriting

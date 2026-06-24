@@ -76,7 +76,8 @@ Incrementally scaffold Connect-RPC backends from proto definitions. Each skill b
 | `/outbox` | Add transactional outbox pattern with River job queue for reliable event delivery |
 | `/streaming` | Generate Kafka workers (River to Kafka) and typed consumer group stubs |
 | `/mcp-tools` | Generate MCP tool wrappers exposing service operations for Claude integration |
+| `/mcp-server` | Generate an MCP server entrypoint under `cmd/` with in-process handler wiring over stdio |
 | `/verify` | Verify structural consistency, naming conventions, and cross-layer alignment |
 
-Skills are designed to work incrementally: `/config` -> `/db-schema` -> `/protos` -> `/api-handlers` -> `/api-server` -> `/outbox` -> `/streaming` -> `/mcp-tools`. Run `/verify` at any point to verify everything holds together. Each skill assesses the existing codebase before generating, so it can adapt to established patterns or suggest incremental refactors toward the target conventions.
+Skills are designed to work incrementally: `/config` -> `/db-schema` -> `/protos` -> `/api-handlers` -> `/api-server` -> `/outbox` -> `/streaming` -> `/mcp-tools` -> `/mcp-server`. Run `/verify` at any point to verify everything holds together. Each skill assesses the existing codebase before generating, so it can adapt to established patterns or suggest incremental refactors toward the target conventions.
 
