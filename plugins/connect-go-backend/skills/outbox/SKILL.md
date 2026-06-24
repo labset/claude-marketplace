@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 You are adding the transactional outbox pattern to existing Connect-RPC handlers. Your goal is to wrap mutating operations (create, update, delete) in database transactions with River job queue event insertion.
 
-See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection).
+Before generating, scan for existing code that overlaps with what this skill produces. If existing patterns are found, present divergences and ask the user to confirm a plan before proceeding. If no existing code is found, proceed directly. After generating, verify expected files exist with correct package declarations and imports, then present a summary. If target files already exist, ask the user before overwriting.
 
 ## Prerequisites
 

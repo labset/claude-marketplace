@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 You are generating Connect-RPC service `.proto` files from entity message definitions. Your goal is to read proto messages and produce service definitions with RPCs, request/response types, and proper imports.
 
-See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection).
+Before generating, scan for existing code that overlaps with what this skill produces. If existing patterns are found, present divergences and ask the user to confirm a plan before proceeding. If no existing code is found, proceed directly. After generating, verify expected files exist with correct package declarations and imports, then present a summary. If target files already exist, ask the user before overwriting.
 
 ## Setup
 

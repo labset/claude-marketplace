@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 You are generating the database layer for a Connect-RPC backend. Your goal is to read proto message definitions and produce PostgreSQL schema, sqlc query definitions, sqlc configuration, and Atlas migration configuration.
 
-See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection).
+Before generating, scan for existing code that overlaps with what this skill produces. If existing patterns are found, present divergences and ask the user to confirm a plan before proceeding. If no existing code is found, proceed directly. After generating, verify expected files exist with correct package declarations and imports, then present a summary. If target files already exist, ask the user before overwriting.
 
 ## Setup
 

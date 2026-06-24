@@ -8,8 +8,6 @@ disable-model-invocation: true
 
 You are reviewing a connect-backend codebase to verify that all generated and hand-written code follows the expected structural patterns, naming conventions, and cross-layer alignment. Your goal is to identify gaps, inconsistencies, and convention violations — then suggest targeted fixes.
 
-See `CONVENTIONS.md` for shared conventions.
-
 ## Setup
 
 1. Determine the review scope:

@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 You are generating a configuration package under `internal/config/` that consolidates environment variable resolution into a single typed struct.
 
-See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection).
+Before generating, scan for existing code that overlaps with what this skill produces. If existing patterns are found, present divergences and ask the user to confirm a plan before proceeding. If no existing code is found, proceed directly. After generating, verify expected files exist with correct package declarations and imports, then present a summary. If target files already exist, ask the user before overwriting.
 
 ## Setup
 

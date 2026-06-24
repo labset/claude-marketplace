@@ -13,7 +13,7 @@ You are generating a server entrypoint under `cmd/`. The first argument selects 
 
 An optional second argument overrides the name: `/server api inventory` produces `cmd/api-inventory/`.
 
-See `CONVENTIONS.md` for shared conventions (codebase assessment, verify step, overwrite protection, cmd/ naming).
+Before generating, scan for existing code that overlaps with what this skill produces. If existing patterns are found, present divergences and ask the user to confirm a plan before proceeding. If no existing code is found, proceed directly. After generating, verify expected files exist with correct package declarations and imports, then present a summary. If target files already exist, ask the user before overwriting.
 
 ## Prerequisites
 
@@ -29,7 +29,7 @@ If prerequisites are missing, inform the user which skills to run first.
 ## Setup
 
 1. Parse the transport argument (`api` or `mcp`) — if omitted, ask the user
-2. Apply the naming convention from `CONVENTIONS.md` (`api-` or `mcp-` prefix)
+2. Apply the naming convention: `api-` prefix for Connect-RPC APIs, `mcp-` prefix for MCP tools
 3. Read `go.mod` for the module path
 4. Scan for `api/handler_*.go` to discover handler constructors
 5. For `mcp` transport, also scan for `mcp/registry_*.go` to discover tool registries
