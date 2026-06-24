@@ -105,10 +105,13 @@ env "local" {
   ]
   dev = "docker://postgres/17-alpine/dev"
   migration {
-    dir = "file://migrations"
+    dir    = "file://migrations"
+    format = goose
   }
 }
 ```
+
+The default migration format is `goose`. If the user specifies a different format (e.g. `golang-migrate`, `flyway`), use that instead.
 
 Generate `sql/baseline.sql`:
 
@@ -116,6 +119,21 @@ Generate `sql/baseline.sql`:
 -- This prevents Atlas from attempting to drop the public schema
 CREATE SCHEMA IF NOT EXISTS public;
 ```
+
+## Embedded Migrations
+
+Generate `migrations.go` as a sibling to `atlas.hcl`:
+
+```go
+package <version>
+
+import "embed"
+
+//go:embed migrations/*.sql
+var Migrations embed.FS
+```
+
+This embeds the migration files for use at runtime (e.g. with goose). The `package` declaration must match the directory name (e.g. `package v1`).
 
 ## Go Generate File
 
@@ -128,7 +146,7 @@ package <version>
 //go:generate atlas migrate diff --env local
 ```
 
-The `package` declaration must match the directory name (e.g. `package v1`). This allows running `go generate ./internal/<provider>/<domain>/<version>/` to execute both sqlc code generation and Atlas migration diffing in one command.
+This allows running `go generate ./internal/<provider>/<domain>/<version>/` to execute both sqlc code generation and Atlas migration diffing in one command.
 
 ## Rules
 
