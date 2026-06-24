@@ -1,5 +1,5 @@
 {
   "name": "spec-delivery",
-  "description": "Spec-driven delivery workflow: discuss requirements, ship milestones, audit implementations, and review future work",
-  "version": "1.0.0"
+  "description": "Spec-driven delivery workflow: discuss requirements, orchestrate parallel execution waves, ship milestones autonomously via worktree subagents, audit implementations, and review future work",
+  "version": "2.0.0"
 }
